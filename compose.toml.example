@@ -1,0 +1,12 @@
+# Compose Configuration Example
+
+# Mode: "document" or "slides"
+mode = "document"
+
+# Output format: "text", "pdf", or "html"
+output = "pdf"
+
+# Future options (not yet implemented):
+# title = "My Document"
+# author = "Your Name"
+# date = "2025-11-07"

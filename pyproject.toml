@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "compose"
+version = "0.1.0"
+description = "Minimal Markdown typesetting system"
+authors = ["rbf22 <rbf22@example.com>"]
+readme = "README.md"
+
+[tool.poetry.scripts]
+compose = "compose.cli:main"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
