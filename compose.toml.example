@@ -3,10 +3,42 @@
 # Mode: "document" or "slides"
 mode = "document"
 
-# Output format: "text", "pdf", or "html"
-output = "pdf"
+# Output format: "text", "html", or "pdf"
+output = "html"
+
+# Typography settings
+[typography]
+line_length = 100
+font_family = "sans-serif"  # "serif", "sans-serif", "monospace"
+font_size = 14
+line_height = 1.6
+paragraph_spacing = 1.2
+heading_scale = [2.5, 2.0, 1.8, 1.5, 1.3, 1.2]
+
+# Color scheme
+[colors]
+text = "#2c3e50"
+headings = "#1a252f"
+links = "#3498db"
+code_background = "#ecf0f1"
+blockquote_border = "#bdc3c7"
+
+# Page margins (for HTML/PDF)
+[margins]
+top = 30
+bottom = 30
+left = 25
+right = 25
+
+# Feature toggles
+[features]
+syntax_highlighting = true
+smart_quotes = true
+smart_dashes = true
+math_rendering = true
 
 # Future options (not yet implemented):
 # title = "My Document"
 # author = "Your Name"
 # date = "2025-11-07"
+# theme = "dark"  # "light", "dark", "auto"
