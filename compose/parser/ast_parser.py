@@ -91,8 +91,12 @@ class MarkdownParser:
         if self._is_list_item(line):
             return self._parse_list(lines, start)
 
-        # Horizontal rule
-        if line.strip() in ['---', '***', '___']:
+        # Horizontal rule (3+ dashes, asterisks, or underscores)
+        stripped = line.strip()
+        if (len(stripped) >= 3 and 
+            all(c == '-' for c in stripped) or
+            all(c == '*' for c in stripped) or
+            all(c == '_' for c in stripped)):
             return HorizontalRule(), 1
 
         # Mermaid diagrams

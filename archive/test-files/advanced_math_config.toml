@@ -1,0 +1,18 @@
+output = "html"
+multi_page = true
+typography = { preset = "academic" }
+
+[features]
+cross_references = true
+math_rendering = true
+advanced_typography = true
+
+[plugins]
+directories = ["plugins"]
+enabled = ["highlight"]
+
+[margins]
+top = 60
+bottom = 60
+left = 50
+right = 50

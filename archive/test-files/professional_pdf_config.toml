@@ -1,0 +1,42 @@
+# Professional PDF Configuration
+output = "pdf"
+multi_page = true
+
+# High-quality rendering
+dpi = 300
+
+# Professional margins (in points)
+[margins]
+left = 72    # 1 inch
+right = 72   # 1 inch
+top = 72     # 1 inch
+bottom = 72  # 1 inch
+
+# Academic typography preset
+[typography]
+preset = "academic"
+line_height = 1.6
+paragraph_spacing = 18
+
+# Professional color scheme
+[colors]
+text = [0.0, 0.0, 0.0]        # Black text
+background = [1.0, 1.0, 1.0]  # White background
+
+# Rich document metadata
+[metadata]
+Title = "Professional PDF Features Demo"
+Author = "Compose Typesetting System"
+Subject = "Demonstration of professional PDF generation capabilities"
+Keywords = "PDF, typography, metadata, bookmarks, professional, typesetting"
+Creator = "Compose Professional PDF Renderer"
+Producer = "Compose Typesetting System v1.0"
+
+# Advanced features
+[features]
+bookmarks = true
+kerning = true
+ligatures = true
+compressed_streams = true
+rich_metadata = true
+structured_navigation = true

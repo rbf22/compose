@@ -8,6 +8,9 @@ def render_html(nodes, config):
     margins = config.get('margins', {})
     features = config.get('features', {})
 
+    # Get language from config for accessibility
+    language = config.get('language', 'en')
+
     # Generate dynamic CSS based on configuration
     css_styles = _generate_css_styles(typography, colors, margins, features)
 
@@ -15,7 +18,7 @@ def render_html(nodes, config):
     head_content = _generate_html_head(config)
 
     output = ['<!DOCTYPE html>',
-              '<html lang="en">',
+              f'<html lang="{language}">',
               f'<head>{head_content}',
               '    <style>',
               css_styles,
@@ -262,6 +265,11 @@ def _generate_css_styles(typography, colors, margins, features):
 
     return '\n        '.join(css)
 
+def _escape_html_attribute(text: str) -> str:
+    """Escape text for use in HTML attributes"""
+    return text.replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+
+
 def _render_node_html(node):
     """Render a single node to HTML"""
     if node.type == 'heading':
@@ -317,7 +325,10 @@ def _render_inline_html(node):
                     enhanced_math = _apply_mathematical_transformations(math_content)
                     parts.append(f'<span class="math math-enhanced" style="font-style: italic; color: #c92c2c;">{enhanced_math}</span>')
                 elif child.type == 'image':
-                    parts.append(f'<img src="{child.text}" alt="{child.text}" style="max-width: 100%;">')
+                    # Use proper alt text with fallback, add accessibility attributes
+                    alt_text = getattr(child, 'alt', child.text) or "Image"
+                    title_attr = f' title="{child.text}"' if child.text != alt_text else ''
+                    parts.append(f'<img src="{child.text}" alt="{_escape_html_attribute(alt_text)}"{title_attr} style="max-width: 100%;" loading="lazy">')
                 elif child.type == 'link':
                     parts.append(f'<a href="{child.text}">{child.text}</a>')
                 elif child.type == 'blockquote':
@@ -378,18 +389,27 @@ def _apply_syntax_highlighting(code: str, language: str) -> str:
     return escaped_code
 
 def _render_table_html(node):
-    """Render a table to HTML"""
+    """Render a table to HTML with accessibility features"""
     if not node.headers and not node.rows:
         return ''
 
-    html = ['<table>']
+    # Generate a unique ID for the table for accessibility
+    table_id = f"table_{hash(str(node)) % 10000}"
+    
+    html = [f'<table id="{table_id}">']
 
     # Header
     if node.headers:
-        html.append('<thead><tr>')
-        for header in node.headers:
-            html.append(f'<th>{_render_inline_html(header)}</th>')
-        html.append('</tr></thead>')
+        html.append('<thead>')
+        for header_row in node.headers:
+            html.append('<tr>')
+            for i, header in enumerate(header_row):
+                header_content = _render_inline_html(header)
+                # Add scope attribute for screen readers
+                scope_attr = ' scope="col"' if len(node.headers) == 1 else ''
+                html.append(f'<th{scope_attr}>{header_content}</th>')
+            html.append('</tr>')
+        html.append('</thead>')
 
     # Body
     if node.rows:

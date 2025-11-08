@@ -1,9 +1,9 @@
 # tests/test_universal_layout.py
 """Tests for the universal layout engine."""
 
-from compose.layout import UniversalLayoutEngine, DocumentBuilder
-from compose.layout import UniversalBox, ContentType, BoxType, RenderingStyle
-from compose.layout import MathBox, Dimensions
+from compose.layout.layout_engine import UniversalLayoutEngine, DocumentBuilder
+from compose.layout.universal_box import UniversalBox, ContentType, BoxType, RenderingStyle
+from compose.layout.box_model import MathBox, Dimensions
 
 
 def test_universal_layout_engine_creation():

@@ -17,6 +17,7 @@ class Dimensions:
     width: float
     height: float  # Above baseline
     depth: float   # Below baseline
+    right: float = 0  # For CSS-style margins/padding
     
     @property
     def total_height(self) -> float:
@@ -69,6 +70,14 @@ class BoxType(Enum):
     GRID = "grid"               # Grid layout container
 
 
+class FloatPlacement(Enum):
+    """Float placement options following LaTeX conventions."""
+    HERE = "here"               # Place at current position
+    TOP = "top"                 # Place at top of page/column
+    BOTTOM = "bottom"           # Place at bottom of page/column
+    PAGE = "page"               # Place on separate page
+
+
 @dataclass
 class RenderingStyle:
     """Styling information for content rendering."""
@@ -99,9 +108,9 @@ class RenderingStyle:
     
     def __post_init__(self):
         if self.margin is None:
-            self.margin = Dimensions(0, 0, 0)
+            self.margin = Dimensions(0, 0, 0, 0)
         if self.padding is None:
-            self.padding = Dimensions(0, 0, 0)
+            self.padding = Dimensions(0, 0, 0, 0)
 
 
 @dataclass
@@ -152,6 +161,11 @@ class UniversalBox:
     # Dynamic behavior
     animation: Optional[AnimationTiming] = None
     interaction: Optional[InteractionData] = None
+    
+    # Float and caption support
+    float_placement: Optional[FloatPlacement] = None
+    caption: Optional[str] = None
+    label: Optional[str] = None  # For cross-references
     
     # Metadata
     id: Optional[str] = None
@@ -231,6 +245,11 @@ class UniversalBox:
         if self.is_container():
             return self.content
         return []
+
+    @property
+    def children(self) -> List['UniversalBox']:
+        """Get child boxes (alias for get_children for compatibility)."""
+        return self.get_children()
     
     def apply_style(self, style: RenderingStyle):
         """Apply styling to this box."""
@@ -307,3 +326,84 @@ def create_code_box(code: str, language: str = "") -> UniversalBox:
         attributes={"language": language},
         style=RenderingStyle(font_family="monospace")
     )
+
+
+def create_figure_box(content: Union[str, UniversalBox], caption: str = "", 
+                      label: str = "", float_placement: FloatPlacement = FloatPlacement.HERE) -> UniversalBox:
+    """Create a figure box with caption and float placement."""
+    # If content is a string, wrap it in an appropriate box
+    if isinstance(content, str):
+        # Assume it's an image path
+        content_box = UniversalBox(
+            content=content,
+            content_type=ContentType.IMAGE,
+            box_type=BoxType.BLOCK
+        )
+    else:
+        content_box = content
+    
+    # Create figure container
+    figure_box = UniversalBox(
+        content=[content_box],
+        content_type=ContentType.IMAGE,  # Could be ContentType.FIGURE if we add it
+        box_type=BoxType.FLOAT,
+        float_placement=float_placement,
+        caption=caption,
+        label=label
+    )
+    
+    # Add caption if provided
+    if caption:
+        caption_box = create_text_box(f"Figure: {caption}", 
+                                    RenderingStyle(font_size=10.0, font_style="italic"))
+        figure_box.add_child(caption_box)
+    
+    return figure_box
+
+
+def create_table_box(table_data: List[List[str]], headers: Optional[List[str]] = None,
+                    caption: str = "", label: str = "", 
+                    float_placement: FloatPlacement = FloatPlacement.HERE) -> UniversalBox:
+    """Create a table box with caption and float placement."""
+    # Create table content structure
+    table_content = {
+        'headers': headers or [],
+        'rows': table_data
+    }
+    
+    table_box = UniversalBox(
+        content=table_content,
+        content_type=ContentType.TABLE,
+        box_type=BoxType.FLOAT,
+        float_placement=float_placement,
+        caption=caption,
+        label=label
+    )
+    
+    # Add caption if provided
+    if caption:
+        caption_box = create_text_box(f"Table: {caption}", 
+                                    RenderingStyle(font_size=10.0, font_style="italic"))
+        table_box.add_child(caption_box)
+    
+    return table_box
+
+
+def create_float_box(content: Union[str, UniversalBox], float_placement: FloatPlacement,
+                    caption: Optional[str] = None, label: Optional[str] = None) -> UniversalBox:
+    """Create a floating box with specified placement."""
+    if isinstance(content, str):
+        content_box = create_text_box(content)
+    else:
+        content_box = content
+    
+    float_box = UniversalBox(
+        content=[content_box],
+        content_type=content_box.content_type,
+        box_type=BoxType.FLOAT,
+        float_placement=float_placement,
+        caption=caption,
+        label=label
+    )
+    
+    return float_box

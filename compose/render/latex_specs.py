@@ -322,6 +322,49 @@ LATEX_TO_UNICODE.update(LATEX_TO_UNICODE_BASE)
 LATEX_TO_UNICODE.update(_make_greek_letters())
 
 
+def unicode_to_latex(text):
+    """
+    Convert Unicode mathematical symbols back to LaTeX commands.
+
+    Args:
+        text (str): Text containing Unicode mathematical symbols
+
+    Returns:
+        str: Text with Unicode symbols converted to LaTeX commands
+    """
+    result = text
+
+    # Only replace actual Unicode mathematical symbols, not regular text
+    replacements = {
+        '∫': '\\int',
+        '∑': '\\sum',
+        '∏': '\\prod',
+        '√': '\\sqrt',
+        '∞': '\\infty',
+        'α': '\\alpha',
+        'β': '\\beta',
+        'γ': '\\gamma',
+        'δ': '\\delta',
+        'π': '\\pi',
+        'σ': '\\sigma',
+        'ω': '\\omega',
+        '≤': '\\leq',
+        '≥': '\\geq',
+        '≠': '\\neq',
+        '≈': '\\approx',
+        '≡': '\\equiv',
+        '→': '\\rightarrow',
+        '←': '\\leftarrow',
+        '↑': '\\uparrow',
+        '↓': '\\downarrow',
+    }
+
+    for unicode_sym, latex_cmd in replacements.items():
+        result = result.replace(unicode_sym, latex_cmd)
+
+    return result
+
+
 def latex_to_unicode(text):
     """
     Convert LaTeX mathematical commands to Unicode symbols.
@@ -333,7 +376,9 @@ def latex_to_unicode(text):
         str: Text with LaTeX commands converted to Unicode symbols
     """
     result = text
-    for latex_cmd, unicode_sym in LATEX_TO_UNICODE.items():
+    # Sort by length (longest first) to avoid partial replacements
+    sorted_items = sorted(LATEX_TO_UNICODE.items(), key=lambda x: len(x[0]), reverse=True)
+    for latex_cmd, unicode_sym in sorted_items:
         result = result.replace(latex_cmd, unicode_sym)
     return result
 
