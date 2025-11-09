@@ -166,11 +166,11 @@ def _parse_inline(text: str) -> Node:
     # Apply smart typography first
     text = _apply_smart_typography(text)
 
-    # Handle inline code first (highest priority)
-    text = _parse_inline_code(text, root)
-
-    # Handle bold and italic (need to be careful with order)
+    # Handle bold and italic first (can contain code)
     text = _parse_bold_italic(text, root)
+
+    # Handle inline code (within formatted text)
+    text = _parse_inline_code(text, root)
 
     # Handle inline math
     text = _parse_inline_math(text, root)
@@ -244,9 +244,13 @@ def _parse_bold_italic(text: str, root: Node) -> str:
             if match.start() > 0:
                 root.add_child(Node('text', text=text[:match.start()]))
 
-            # Add the formatted content
+            # Parse the inner content recursively for nested formatting
             content = match.group(1)
-            root.add_child(Node(node_type, text=content))
+            inner_node = _parse_inline(content)
+            
+            # Create the formatted node with children
+            formatted_node = Node(node_type, children=inner_node.children)
+            root.add_child(formatted_node)
 
             # Continue with remaining text
             remaining = text[match.end():]

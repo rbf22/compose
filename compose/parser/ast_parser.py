@@ -8,6 +8,10 @@ from ..model.ast import *
 class MarkdownParser:
     """Clean markdown parser that builds a consistent AST"""
 
+    def __init__(self, config: Dict[str, Any] = None):
+        """Initialize parser with configuration"""
+        self.config = config or {}
+
     def parse(self, content: str) -> Document:
         """Parse markdown content into a Document AST"""
         lines = content.split('\n')
@@ -117,16 +121,27 @@ class MarkdownParser:
         """Parse a paragraph"""
         content_lines = []
         i = start
+        hard_returns_as_newlines = self.config.get('features', {}).get('hard_returns_as_newlines', False)
 
         while i < len(lines):
             line = lines[i]
             # Stop at empty lines or other block elements
             if line.strip() == '' or self._is_block_start(line):
                 break
+            
+            # When hard_returns_as_newlines is enabled, split paragraphs on lines that start with markdown formatting
+            if hard_returns_as_newlines and content_lines and self._starts_with_markdown_formatting(line):
+                break
+                
             content_lines.append(line)
             i += 1
 
-        text = ' '.join(content_lines)
+        # Check if hard returns should be treated as newlines
+        if hard_returns_as_newlines:
+            text = '\n'.join(content_lines)
+        else:
+            text = ' '.join(content_lines)
+        
         content = self._parse_inline(text)
         return Paragraph(content=content), i - start
 
@@ -222,7 +237,7 @@ class MarkdownParser:
         # Parse the content recursively
         quote_content = '\n'.join(quote_lines)
         # Create a temporary parser for the nested content
-        nested_doc = MarkdownParser().parse(quote_content)
+        nested_doc = MarkdownParser(self.config).parse(quote_content)
         return Blockquote(content=nested_doc.blocks), i - start
 
     def _parse_list(self, lines: List[str], start: int) -> tuple[ListBlock, int]:
@@ -275,6 +290,17 @@ class MarkdownParser:
 
         content = '\n'.join(content_lines)
         return MermaidDiagram(content=content), i - start + 1
+
+    def _starts_with_markdown_formatting(self, line: str) -> bool:
+        """Check if a line starts with markdown formatting that should start a new paragraph"""
+        stripped = line.strip()
+        # Check for bold (**text**), italic (*text*), inline code (`text`)
+        # Also check for markdown links [text](url) and images ![alt](url)
+        return (stripped.startswith('**') or 
+                (stripped.startswith('*') and not stripped.startswith('***')) or
+                stripped.startswith('`') or
+                stripped.startswith('[') or
+                stripped.startswith('!['))
 
     def _is_list_item(self, line: str) -> bool:
         """Check if line is a list item"""

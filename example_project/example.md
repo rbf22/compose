@@ -20,27 +20,6 @@
 
 ---
 
-## 📜 Table of Contents
-
-1.  [Introduction: Defining the "Tufte" Aesthetic](#1-introduction-defining-the-tufte-aesthetic)
-2.  [The Core Tenets of Graphical Excellence](#2-the-core-tenets-of-graphical-excellence)
-  * [Graphical Integrity & The Lie Factor](#21-graphical-integrity--the-lie-factor)
-  * [Maximizing the Data-Ink Ratio](#22-maximizing-the-data-ink-ratio)
-3.  [The War on "Chartjunk": A Mathematical Satire](#3-the-war-on-chartjunk-a-mathematical-satire)
-  * [Defining the Enemy: Chartjunk](#31-defining-the-enemy-chartjunk)
-  * [A Formal (and Satirical) Model of Graphical Clutter](#32-a-formal-and-satirical-model-of-graphical-clutter)
-4.  [Key Techniques and Methodologies](#4-key-techniques-and-methodologies)
-  * [Small Multiples](#41-small-multiples)
-  * [Sparklines: "Datawords"](#42-sparklines-datawords)
-5.  [Practical Implementation: Python & `matplotlib`](#5-practical-implementation-python--matplotlib)
-  * [The "Before" Example: A High-Chartjunk Plot](#51-the-before-example-a-high-chartjunk-plot)
-  * [The "After" Example: A Tufte-Optimized Plot](#52-the-after-example-a-tufte-optimized-plot)
-6.  [Process Flow: A Tufte-inspired Workflow](#6-process-flow-a-tufte-inspired-workflow)
-7.  [Conclusion](#7-conclusion)
-8.  [Closing Page](#8-closing-page)
-
----
-
 ## 1. Introduction: Defining the "Tufte" Aesthetic
 
 When exploring the "Tuffty" design style, it is essential to first clarify the terminology. The subject in question is almost certainly **Edward Tufte**, a statistician and artist, and a pioneer in the field of data visualization. His aesthetic is not one of mere decoration, but a rigorous, almost moral philosophy of information design.

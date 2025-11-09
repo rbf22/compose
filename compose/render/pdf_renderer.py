@@ -22,6 +22,7 @@ from ..layout.engines.math_engine import MathLayoutEngine, ExpressionLayout
 from ..layout.content.math_parser import MathExpressionParser
 from .rendering_tracker import RenderingTracker
 from .layout_measurer import LayoutMeasurer
+from .fpdf2_renderer import FPDF2Renderer
 from ..cache_system import performance_monitor
 
 
@@ -304,7 +305,7 @@ class ProfessionalPDFRenderer:
     @performance_monitor.time_operation("pdf_rendering")
     def render(self, doc: Document, config: Dict = None) -> bytes:
         """
-        Render document to professional PDF with advanced features.
+        Render document to professional PDF using FPDF2 for robust layout.
 
         Args:
             doc: Document AST to render
@@ -315,17 +316,21 @@ class ProfessionalPDFRenderer:
         """
         config = config or {}
 
-        # Apply configuration
-        self._apply_config(config)
+        # Use FPDF2Renderer for robust rendering instead of manual PDF commands
+        renderer = FPDF2Renderer(
+            page_width=self.page_width,
+            page_height=self.page_height,
+            margin_left=self.margin_left,
+            margin_right=self.margin_right,
+            margin_top=self.margin_top,
+            margin_bottom=self.margin_bottom
+        )
 
-        # Reset state
-        self._reset_render_state()
+        # Apply configuration to the FPDF2Renderer
+        renderer._apply_config(config)
 
-        # Layout document
-        self._layout_document(doc)
-
-        # Generate PDF structure
-        return self._generate_professional_pdf()
+        # Render using FPDF2Renderer
+        return renderer.render(doc, config)
 
     def _apply_config(self, config: Dict):
         """Apply configuration settings."""

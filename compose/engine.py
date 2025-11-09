@@ -24,7 +24,7 @@ def build(md_path, cfg_path):
     initialize_plugin_system(config)
     
     # Parse markdown using new AST parser
-    parser = MarkdownParser()
+    parser = MarkdownParser(config)
     with open(md_path, 'r', encoding='utf-8') as f:
         content = f.read()
 

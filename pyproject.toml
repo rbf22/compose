@@ -11,6 +11,8 @@ compose = "compose.cli:main"
 [tool.poetry.dependencies]
 python = "^3.12"
 pytest = "^8.4.2"
+fpdf2 = "^2.8.5"
+matplotlib = "^3.10.7"
 
 [build-system]
 requires = ["poetry-core"]

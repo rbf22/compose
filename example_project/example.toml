@@ -6,6 +6,7 @@ typography = { preset = "academic" }
 cross_references = true
 math_rendering = true
 advanced_typography = true
+hard_returns_as_newlines = true
 
 [plugins]
 directories = ["plugins"]
