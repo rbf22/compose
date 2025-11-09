@@ -20,6 +20,8 @@ from ..model.ast import Document, Heading, Paragraph, MathBlock, MathInline, Cod
 from ..layout.box_model import MathBox, BoxType, Dimensions
 from ..layout.engines.math_engine import MathLayoutEngine, ExpressionLayout
 from ..layout.content.math_parser import MathExpressionParser
+from .rendering_tracker import RenderingTracker
+from .layout_measurer import LayoutMeasurer
 from ..cache_system import performance_monitor
 
 
@@ -110,35 +112,48 @@ class ProfessionalPDFRenderer:
         self.dpi = 300  # High DPI for crisp output
         self.enable_high_quality = True
 
+        # New architecture components
+        self.tracker = RenderingTracker()
+        self.measurer = LayoutMeasurer(
+            page_width=self.page_width,
+            page_height=self.page_height,
+            margin_left=self.margin_left,
+            margin_right=self.margin_right,
+            margin_top=self.margin_top,
+            margin_bottom=self.margin_bottom,
+            font_metrics=self.font_metrics,
+            current_font_size=self.current_font_size
+        )
+
     def _load_font_metrics(self) -> Dict[str, Dict]:
         """Load font metrics for accurate text layout"""
-        # Basic font metrics (widths in points for 1pt font)
+        # Basic font metrics (in font units where 1000 = 1em)
         return {
             "Times-Roman": {
-                "ascent": 11.0,
-                "descent": -3.0,
-                "line_gap": 3.0,
+                "ascent": 770,    # Standard Times ascent
+                "descent": -230,  # Standard Times descent  
+                "line_gap": 200,  # Standard line gap
                 "units_per_em": 1000,
                 "glyph_widths": self._get_standard_font_widths("Times-Roman")
             },
             "Times-Bold": {
-                "ascent": 11.0,
-                "descent": -3.0,
-                "line_gap": 3.0,
+                "ascent": 770,
+                "descent": -230,
+                "line_gap": 200,
                 "units_per_em": 1000,
                 "glyph_widths": self._get_standard_font_widths("Times-Bold")
             },
             "Helvetica": {
-                "ascent": 11.5,
-                "descent": -3.0,
-                "line_gap": 2.0,
+                "ascent": 770,    # Standard Helvetica ascent
+                "descent": -230,  # Standard Helvetica descent
+                "line_gap": 200,  # Standard line gap
                 "units_per_em": 1000,
                 "glyph_widths": self._get_standard_font_widths("Helvetica")
             },
             "Courier": {
-                "ascent": 10.0,
-                "descent": -3.0,
-                "line_gap": 2.0,
+                "ascent": 770,    # Monospace fonts have similar metrics
+                "descent": -230,
+                "line_gap": 200,
                 "units_per_em": 1000,
                 "glyph_widths": self._get_standard_font_widths("Courier")
             }
@@ -334,16 +349,184 @@ class ProfessionalPDFRenderer:
         self.current_page = 0
         self.current_y = self.page_height - self.margin_top
         self.pages = [[]]
+        
+        # Reset new architecture components
+        self.tracker.clear()
+        self.measurer = LayoutMeasurer(
+            page_width=self.page_width,
+            page_height=self.page_height,
+            margin_left=self.margin_left,
+            margin_right=self.margin_right,
+            margin_top=self.margin_top,
+            margin_bottom=self.margin_bottom,
+            font_metrics=self.font_metrics,
+            current_font_size=self.current_font_size
+        )
 
-    def _layout_document(self, doc: Document):
-        """Layout the entire document with professional typography."""
+    def _layout_document_clean(self, doc: Document):
+        """
+        Clean implementation using Measure → Update → Render → Check pipeline.
+        
+        This replaces the old _layout_document with a new architecture that:
+        1. MEASURES each component's height before rendering
+        2. UPDATES page state and handles page breaks 
+        3. RENDERS components at calculated positions
+        4. CHECKS for overlaps and margin violations
+        """
         # Title page if specified
         if doc.frontmatter.get('title'):
-            self._add_title_page(doc)
+            self._render_title_page(doc)
+            # Reset tracker and measurer after title page
+            self.tracker.clear()
+            self.measurer = LayoutMeasurer(
+                page_width=self.page_width,
+                page_height=self.page_height,
+                margin_left=self.margin_left,
+                margin_right=self.margin_right,
+                margin_top=self.margin_top,
+                margin_bottom=self.margin_bottom,
+                font_metrics=self.font_metrics,
+                current_font_size=self.current_font_size
+            )
 
-        # Layout each block
+        # Process each block using the new pipeline
         for block in doc.blocks:
-            self._layout_block(block)
+            # MEASURE phase
+            measurement = self.measurer.measure(block)
+            
+            # UPDATE phase - check if component fits, handle page breaks, add spacing
+            available_height = self.measurer.get_available_height(self.current_y)
+            
+            # Check if we need a page break (component doesn't fit)
+            if measurement.height > available_height and not measurement.can_split:
+                self._new_page_clean()
+            
+            # Add spacing before component (UPDATE phase)
+            if measurement.spacing_before > 0:
+                # Record spacing at current position before moving
+                spacing_y_top = self.current_y
+                self.tracker.record_spacer(
+                    x=self.margin_left,
+                    y=spacing_y_top,
+                    width=self.page_width - self.margin_left - self.margin_right,
+                    height=measurement.spacing_before,
+                    page=self.current_page,
+                    label="spacing_before"
+                )
+                # Then move current_y down by spacing
+                self.current_y -= measurement.spacing_before
+            
+            # RENDER phase - render at current position
+            self.current_y = self._render_block_clean(block, self.current_y)
+            
+            # CHECK phase - tracker automatically validates via record methods
+            
+        # Final validation
+        errors = self.tracker.validate_all(
+            page_height=self.page_height,
+            page_width=self.page_width,
+            margin_top=self.margin_top,
+            margin_bottom=self.margin_bottom,
+            margin_left=self.margin_left,
+            margin_right=self.margin_right
+        )
+        
+        if errors:
+            print(f"Rendering validation errors: {len(errors)}")
+            for error in errors[:10]:  # Show first 10 errors
+                print(f"  {error}")
+            if len(errors) > 10:
+                print(f"  ... and {len(errors) - 10} more errors")
+
+    def _layout_document(self, doc: Document):
+        """Legacy method - now delegates to clean implementation."""
+        self._layout_document_clean(doc)
+
+    def _render_title_page(self, doc: Document):
+        """Render title page using new architecture."""
+        title = doc.frontmatter.get('title', 'Document')
+        author = doc.frontmatter.get('author', '')
+        date = doc.frontmatter.get('date', datetime.now().strftime('%Y-%m-%d'))
+
+        # Position title page content with generous vertical spacing
+        title_y = self.page_height - 150
+        author_y = self.page_height - 250
+        date_y = self.page_height - 320
+
+        commands = [
+            # Title (large, bold)
+            "BT",
+            "0 0 0 rg",
+            "/Helvetica 36 Tf",
+            f"1 0 0 1 {self.margin_left} {title_y} Tm",
+            f"{self._to_pdf_literal(title)} Tj",
+            "ET",
+
+            # Author
+            "BT",
+            "0 0 0 rg",
+            "/Helvetica 18 Tf",
+            f"1 0 0 1 {self.margin_left} {author_y} Tm",
+            f"{self._to_pdf_literal(author)} Tj",
+            "ET",
+
+            # Date
+            "BT",
+            "0 0 0 rg",
+            "/Helvetica 12 Tf",
+            f"1 0 0 1 {self.margin_left} {date_y} Tm",
+            f"{self._to_pdf_literal(date)} Tj",
+            "ET"
+        ]
+
+        self._add_to_current_page(commands)
+        self._new_page_clean()
+
+    def _new_page_clean(self):
+        """Start a new page with new architecture."""
+        self.pages.append([])
+        self.current_page += 1
+        self.current_y = self.page_height - self.margin_top
+        self.tracker.current_page = self.current_page
+
+    def _add_spacing_between_blocks(self, points: float):
+        """Add spacing between blocks in UPDATE phase."""
+        if points > 0:
+            # Record spacing area below current position (not overlapping with content above)
+            spacing_y_bottom = self.current_y - points
+            spacing_height = points
+            self.tracker.record_spacer(
+                x=self.margin_left,
+                y=spacing_y_bottom + spacing_height,  # Top of spacing area
+                width=self.page_width - self.margin_left - self.margin_right,
+                height=spacing_height,
+                page=self.current_page,
+                label="block_spacing"
+            )
+            # Move current_y down by spacing amount
+            self.current_y -= points
+
+    def _render_block_clean(self, block, y: float) -> float:
+        """Render a block at the given Y position, return new Y."""
+        if isinstance(block, Heading):
+            return self._render_heading(block, y)
+        elif isinstance(block, Paragraph):
+            return self._render_paragraph(block, y)
+        elif isinstance(block, MathBlock):
+            return self._render_math_block(block, y)
+        elif isinstance(block, CodeBlock):
+            return self._render_code_block(block, y)
+        elif isinstance(block, ListBlock):
+            return self._render_list_block(block, y)
+        elif isinstance(block, Image):
+            return self._render_image(block, y)
+        elif isinstance(block, Table):
+            return self._render_table(block, y)
+        elif hasattr(block, '__class__') and block.__class__.__name__ == 'HorizontalRule':
+            return self._render_horizontal_rule(block, y)
+        else:
+            # Unknown block type - skip
+            return y
 
     def _layout_block(self, block):
         """Layout a document block with proper spacing and typography."""
@@ -1251,6 +1434,302 @@ startxref
         info_dict += ">>\n"
 
         return info_dict
+
+
+    # New Architecture Render Methods
+    # These methods render at a given Y position and return the new Y position
+
+    def _render_heading(self, heading: Heading, y: float) -> float:
+        """Render heading at given Y position."""
+        level = heading.level
+        text = self._extract_text_content(heading.content)
+
+        # Heading sizes and fonts
+        sizes = {1: 24, 2: 20, 3: 16, 4: 14, 5: 12, 6: 12}
+        font_size = sizes.get(level, 12)
+        font_name = "Helvetica"
+
+        # Get font metrics for proper bounding box
+        font_metrics = self.font_metrics.get("Helvetica", {})
+        ascender = font_metrics.get('ascent', font_size * 0.8) / 1000.0 * font_size
+        descender = abs(font_metrics.get('descent', font_size * 0.2)) / 1000.0 * font_size
+
+        # Calculate text dimensions for tracker - record from top of text
+        text_width = self.get_text_width(text, font_name, font_size)
+        text_top = y + ascender  # Top of text bounding box
+        text_height = ascender + descender  # Total text height
+
+        # Render text
+        commands = [
+            "BT",
+            "0 0 0 rg",
+            f"/{font_name} {font_size} Tf",
+            f"1 0 0 1 {self.margin_left} {y} Tm",
+            f"{self._to_pdf_literal(text)} Tj",
+            "ET"
+        ]
+
+        self._add_to_current_page(commands)
+
+        # Record in tracker with correct bounding box
+        self.tracker.record_text(
+            x=self.margin_left,
+            y=text_top,  # Top of text bounding box
+            width=text_width,
+            height=text_height,  # Total height from top to bottom
+            page=self.current_page,
+            label=f"h{level}_{text[:20]}"
+        )
+
+        # Add bookmark
+        self._add_bookmark(text, level, self.current_page, y)
+
+        # Get spacing_after from measurement (this is a bit hacky, but works)
+        # In a real implementation, we'd pass the measurement to the render method
+        spacing_after_map = {1: 18, 2: 12, 3: 9, 4: 6, 5: 6, 6: 6}
+        spacing_after = spacing_after_map.get(level, 6)
+        
+        # Return new Y position (moved down by content + spacing_after)
+        return y - text_height - spacing_after
+
+    def _render_paragraph(self, paragraph: Paragraph, y: float) -> float:
+        """Render paragraph at given Y position."""
+        text = self._extract_text_content(paragraph.content)
+
+        if not text.strip():
+            return y
+
+        # Apply typography
+        processed_text = self._apply_ligatures(text)
+        lines = self._wrap_text(processed_text, self.page_width - self.margin_left - self.margin_right)
+
+        # Get font metrics for proper bounding box
+        font_metrics = self.font_metrics.get("Helvetica", {})
+        ascender = font_metrics.get('ascent', self.current_font_size * 0.8) / 1000.0 * self.current_font_size
+        descender = abs(font_metrics.get('descent', self.current_font_size * 0.2)) / 1000.0 * self.current_font_size
+        text_height = ascender + descender
+
+        for line in lines:
+            # Apply kerning
+            kerned_line = self._apply_kerning(line, self.current_font)
+            line_width = self.get_text_width(kerned_line, self.current_font, self.current_font_size)
+            line_top = y + ascender  # Top of text bounding box
+
+            commands = [
+                "BT",
+                "0 0 0 rg",
+                f"/Helvetica {self.current_font_size} Tf",
+                f"1 0 0 1 {self.margin_left} {y} Tm",
+                f"{self._to_pdf_literal(kerned_line)} Tj",
+                "ET"
+            ]
+
+            self._add_to_current_page(commands)
+
+            # Record line in tracker with proper text bounds
+            self.tracker.record_text(
+                x=self.margin_left,
+                y=line_top,  # Top of text bounding box
+                width=line_width,
+                height=text_height,  # Actual text height, not line height
+                page=self.current_page,
+                label=f"para_line_{line[:15]}"
+            )
+
+            # Move down for next line by line height (not text height)
+            y -= self.current_font_size * self.line_height_factor
+
+        # Return final Y position
+        return y
+
+    def _render_math_block(self, math_block: MathBlock, y: float) -> float:
+        """Render math block at given Y position."""
+        content = math_block.content.strip()
+        if content.startswith('$$') and content.endswith('$$'):
+            content = content[2:-2].strip()
+        elif content.startswith('$') and content.endswith('$'):
+            content = content[1:-1].strip()
+
+        # For now, render as simple text (placeholder)
+        math_text = f"[MATH: {content}]"
+        center_x = self.page_width // 2
+        text_width = self.get_text_width(math_text, "Helvetica", 12)
+
+        commands = [
+            "BT",
+            "0 0 0 rg",
+            "/Helvetica 12 Tf",
+            f"1 0 0 1 {center_x - len(math_text)*3} {y - 12} Tm",
+            f"{self._to_pdf_literal(math_text)} Tj",
+            "ET"
+        ]
+
+        self._add_to_current_page(commands)
+
+        # Record in tracker
+        self.tracker.record_text(
+            x=center_x - len(math_text)*3,
+            y=y,
+            width=text_width,
+            height=24,
+            page=self.current_page,
+            label="math_block"
+        )
+
+        return y - 24
+
+    def _render_code_block(self, code_block: CodeBlock, y: float) -> float:
+        """Render code block at given Y position."""
+        lines = code_block.content.split('\n')
+        start_y = y
+
+        for line in lines:
+            if line.strip():
+                line_width = self.get_text_width(line, "Helvetica", 10)
+                commands = [
+                    "BT",
+                    "0 0 0 rg",
+                    "/Helvetica 10 Tf",
+                    f"1 0 0 1 {self.margin_left} {y} Tm",
+                    f"{self._to_pdf_literal(line)} Tj",
+                    "ET"
+                ]
+
+                self._add_to_current_page(commands)
+
+                # Record in tracker
+                self.tracker.record_text(
+                    x=self.margin_left,
+                    y=y,
+                    width=line_width,
+                    height=12,
+                    page=self.current_page,
+                    label="code_line"
+                )
+
+                y -= 12
+
+        return y
+
+    def _render_list_block(self, list_block: ListBlock, y: float) -> float:
+        """Render list block at given Y position."""
+        for i, item in enumerate(list_block.items):
+            if isinstance(item, ListItem):
+                prefix = f"{i+1}. " if list_block.ordered else "• "
+                text = prefix + self._extract_text_content(item.content)
+
+                lines = self._wrap_text(text, self.page_width - self.margin_left - self.margin_right - 20)
+
+                for line in lines:
+                    line_width = self.get_text_width(line, "Helvetica", self.current_font_size)
+
+                    commands = [
+                        "BT",
+                        "0 0 0 rg",
+                        f"/Helvetica {self.current_font_size} Tf",
+                        f"1 0 0 1 {self.margin_left} {y} Tm",
+                        f"{self._to_pdf_literal(line)} Tj",
+                        "ET"
+                    ]
+
+                    self._add_to_current_page(commands)
+
+                    # Record in tracker
+                    self.tracker.record_text(
+                        x=self.margin_left,
+                        y=y,
+                        width=line_width,
+                        height=self.current_font_size * self.line_height_factor,
+                        page=self.current_page,
+                        label="list_item"
+                    )
+
+                    y -= self.current_font_size * self.line_height_factor
+
+        return y
+
+    def _render_image(self, image: Image, y: float) -> float:
+        """Render image at given Y position (placeholder)."""
+        # Placeholder - would need image handling
+        return y - 50
+
+    def _render_table(self, table: Table, y: float) -> float:
+        """Render table at given Y position."""
+        # Simple text representation for now
+        header_text = " | ".join(self._extract_text_content(cell) for cell in table.headers)
+        header_width = self.get_text_width(header_text, "Helvetica", 10)
+
+        commands = [
+            "BT",
+            "0 0 0 rg",
+            "/Helvetica 10 Tf",
+            f"1 0 0 1 {self.margin_left} {y} Tm",
+            f"{self._to_pdf_literal(header_text)} Tj",
+            "ET"
+        ]
+
+        self._add_to_current_page(commands)
+
+        # Record header
+        self.tracker.record_text(
+            x=self.margin_left,
+            y=y,
+            width=header_width,
+            height=12,
+            page=self.current_page,
+            label="table_header"
+        )
+
+        y -= 12
+
+        # Separator
+        sep_text = "-" * 60
+        commands = [
+            "BT",
+            "0 0 0 rg",
+            "/Helvetica 10 Tf",
+            f"1 0 0 1 {self.margin_left} {y} Tm",
+            f"{self._to_pdf_literal(sep_text)} Tj",
+            "ET"
+        ]
+
+        self._add_to_current_page(commands)
+        y -= 12
+
+        # Rows
+        for row in table.rows:
+            row_text = " | ".join(self._extract_text_content(cell) for cell in row)
+            row_width = self.get_text_width(row_text, "Helvetica", 10)
+
+            commands = [
+                "BT",
+                "0 0 0 rg",
+                "/Helvetica 10 Tf",
+                f"1 0 0 1 {self.margin_left} {y} Tm",
+                f"{self._to_pdf_literal(row_text)} Tj",
+                "ET"
+            ]
+
+            self._add_to_current_page(commands)
+
+            # Record row
+            self.tracker.record_text(
+                x=self.margin_left,
+                y=y,
+                width=row_width,
+                height=12,
+                page=self.current_page,
+                label="table_row"
+            )
+
+            y -= 12
+
+        return y
+
+    def _render_horizontal_rule(self, block, y: float) -> float:
+        """Render horizontal rule (page break)."""
+        self._new_page_clean()
+        return self.page_height - self.margin_top
 
 
 # Legacy PDF renderer (basic implementation)

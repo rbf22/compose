@@ -21,11 +21,13 @@ class MeasurementResult:
     content_height: float  # Height of just the content (without spacing)
     can_split: bool  # Whether this component can be split across pages
     spacing_after: float  # Spacing that should follow this component
+    spacing_before: float = 0  # Spacing that should precede this component
     
     def __repr__(self):
         return (f"MeasurementResult(height={self.height:.1f}, "
                 f"content={self.content_height:.1f}, "
-                f"can_split={self.can_split}, spacing={self.spacing_after:.1f})")
+                f"can_split={self.can_split}, spacing_after={self.spacing_after:.1f}, "
+                f"spacing_before={self.spacing_before:.1f})")
 
 
 class LayoutMeasurer:
@@ -92,7 +94,8 @@ class LayoutMeasurer:
                 height=24,
                 content_height=12,
                 can_split=False,
-                spacing_after=spacing_after or 6
+                spacing_after=spacing_after or 6,
+                spacing_before=0
             )
     
     def _measure_heading(self, heading: Heading, spacing_after: Optional[float] = None) -> MeasurementResult:
@@ -110,16 +113,22 @@ class LayoutMeasurer:
         # Heading height
         heading_height = ascender + descender
         
-        # Default spacing after heading
-        spacing_map = {1: 18, 2: 12, 3: 9, 4: 6, 5: 6, 6: 6}
-        default_spacing = spacing_map.get(heading.level, 6)
-        spacing = spacing_after if spacing_after is not None else default_spacing
+        # Spacing before and after heading
+        spacing_before_map = {1: 36, 2: 24, 3: 18, 4: 12, 5: 12, 6: 12}
+        spacing_after_map = {1: 18, 2: 12, 3: 9, 4: 6, 5: 6, 6: 6}
+        spacing_before = spacing_before_map.get(heading.level, 12)
+        default_spacing_after = spacing_after_map.get(heading.level, 6)
+        spacing_after_val = spacing_after if spacing_after is not None else default_spacing_after
+        
+        # Total height includes spacing before, content, and spacing after
+        total_height = spacing_before + heading_height + spacing_after_val
         
         return MeasurementResult(
-            height=heading_height + spacing,
+            height=total_height,
             content_height=heading_height,
             can_split=False,  # Headings cannot be split
-            spacing_after=spacing
+            spacing_after=spacing_after_val,
+            spacing_before=spacing_before  # Add this field
         )
     
     def _measure_paragraph(self, paragraph: Paragraph, spacing_after: Optional[float] = None) -> MeasurementResult:
@@ -155,7 +164,8 @@ class LayoutMeasurer:
             height=content_height + spacing,
             content_height=content_height,
             can_split=True,  # Paragraphs can be split
-            spacing_after=spacing
+            spacing_after=spacing,
+            spacing_before=0
         )
     
     def _measure_code_block(self, code_block: CodeBlock, spacing_after: Optional[float] = None) -> MeasurementResult:
@@ -183,7 +193,8 @@ class LayoutMeasurer:
             height=content_height + spacing,
             content_height=content_height,
             can_split=True,  # Code blocks can be split (though not ideal)
-            spacing_after=spacing
+            spacing_after=spacing,
+            spacing_before=0
         )
     
     def _measure_list(self, list_element: ListBlock, spacing_after: Optional[float] = None) -> MeasurementResult:
@@ -207,7 +218,8 @@ class LayoutMeasurer:
             height=item_height + spacing,
             content_height=item_height,
             can_split=True,  # Lists can be split
-            spacing_after=spacing
+            spacing_after=spacing,
+            spacing_before=0
         )
     
     def _extract_text(self, elements) -> str:

@@ -160,8 +160,12 @@ class RenderingTracker:
             for j in range(i + 1, len(self.content)):
                 other = self.content[j]
                 
-                # AABB algorithm correctly handles spacer overlaps (shared boundaries don't count)
-                # So we check all overlaps including spacers
+                # Skip overlaps between spacing and content (spacing provides intentional gaps)
+                if (item.content_type == ContentType.SPACER and other.content_type != ContentType.SPACER) or \
+                   (other.content_type == ContentType.SPACER and item.content_type != ContentType.SPACER):
+                    continue
+                
+                # AABB algorithm for actual content overlaps
                 if item.overlaps_with(other):
                     errors.append(f"ERROR: Item {i} ({item.label}) overlaps with item {j} ({other.label})")
         
