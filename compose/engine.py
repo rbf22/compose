@@ -71,7 +71,8 @@ def build(md_path, cfg_path):
 
     # Handle document modes
     if output == 'pdf':
-        renderer = PDFRenderer()
+        from .render.pdf_renderer import ProfessionalPDFRenderer
+        renderer = ProfessionalPDFRenderer()
         pdf_data = renderer.render(doc, config)
         print(f"Generated {len(pdf_data)} bytes of PDF data")
         print(f"First 20 bytes: {pdf_data[:20]}")

@@ -62,8 +62,7 @@ This is the central, prescriptive principle of Tufte's design.
 **Data-Ink:** The non-erasable ink used to draw the data itself. This includes data points, labels, and the core parts of axes.
 **Non-Data-Ink:** Ink that can be erased without losing data. This includes gridlines, 3D effects, shadows, background colors, and decorative frames.
 
-The **Data-Ink Ratio ($R_{di}$)
-** is the proportion of a graphic's ink devoted to displaying data.
+The **Data-Ink Ratio ($R_{di}$)** is the proportion of a graphic's ink devoted to displaying data.
 
 $$
 R_{di} = \frac{\text{Ink}_{\text{data}}}{\text{Ink}_{\text{total}}}

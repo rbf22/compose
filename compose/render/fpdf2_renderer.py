@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, Tuple, Any
 from fpdf import FPDF
 from ..model.ast import Document, Heading, Paragraph, MathBlock, MathInline, CodeBlock, ListBlock, ListItem, Link, Image, Text, Bold, Italic, Strikethrough, CodeInline, Table
 from .rendering_tracker import RenderingTracker
+from .math_graphics import MathGraphicsRenderer
+from ..math import MathExpressionParser, MathLayoutEngine
 
 
 class FPDF2Renderer:
@@ -45,6 +47,11 @@ class FPDF2Renderer:
         # RenderingTracker for validation
         self.tracker = RenderingTracker()
         self.current_page = 0
+
+        # Math rendering components
+        self.math_parser = MathExpressionParser()
+        self.math_engine = MathLayoutEngine()
+        self.math_graphics = MathGraphicsRenderer(self)
 
         # Font setup - use built-in fonts initially
         self.setup_fonts()
@@ -365,10 +372,9 @@ class FPDF2Renderer:
                 self._render_text_with_wrapping(code_text, current_x, start_y, max_width, line_height)
                 self.pdf.set_font(original_font, original_style, self.current_font_size)  # Restore
             elif isinstance(element, MathInline):
-                # Inline math - placeholder
-                math_text = f'[{element.content.strip("$")}]'
-                math_text = self._sanitize_text(math_text)
-                self._render_text_with_wrapping(math_text, current_x, start_y, max_width, line_height)
+                # Inline math - render using MathGraphicsRenderer
+                math_content = element.content.strip('$')
+                self._render_inline_math_with_graphics(math_content, current_x, start_y, max_width, line_height)
             elif isinstance(element, Link):
                 # Link - just render text for now
                 link_text = self._sanitize_text(element.text)
@@ -488,6 +494,114 @@ class FPDF2Renderer:
 
         except Exception as e:
             print(f"Math rendering failed: {e}")
+            return False
+
+    def _render_inline_math_with_matplotlib(self, latex: str, x: float, y: float, max_width: float, line_height: float):
+        """Render inline math expression using matplotlib."""
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib
+            matplotlib.use('Agg')
+
+            # Create smaller math rendering for inline
+            fig, ax = plt.subplots(figsize=(3, 0.5))  # Smaller than block math
+            ax.text(0.5, 0.5, f'${latex}$',
+                   fontsize=12, ha='center', va='center',  # Smaller font
+                   transform=ax.transAxes)
+
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.axis('off')
+
+            # Convert to PNG
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', dpi=150,  # Lower DPI for inline
+                       bbox_inches='tight', transparent=True, pad_inches=0.02)
+            plt.close(fig)
+            buf.seek(0)
+
+            # Inline math sizing - smaller than block math
+            img_width = 40  # pts - smaller than block math (120)
+            img_height = 12  # pts - baseline height
+
+            # Position inline with text
+            current_x = self.pdf.get_x()
+            current_y = self.pdf.get_y()
+
+            # Render the image at current position
+            self.pdf.image(buf, x=current_x, y=current_y - 2, w=img_width, h=img_height)
+
+            # Move cursor forward by the image width
+            self.pdf.set_x(current_x + img_width)
+
+            # Record in tracker
+            self.tracker.record_text(
+                x=current_x,
+                y=current_y + img_height,  # Top of math element
+                width=img_width,
+                height=img_height,
+                page=self.current_page,
+                label=f"inline_math_{latex[:10]}"
+            )
+
+            return True
+
+        except Exception as e:
+            print(f"Inline math rendering failed: {e}")
+            # Fallback to text
+            fallback_text = f"[{latex}]"
+            self.pdf.text(self.pdf.get_x(), self.pdf.get_y(), fallback_text)
+            self.pdf.set_x(self.pdf.get_x() + self.pdf.get_string_width(fallback_text))
+            return False
+
+    def _render_inline_math_with_graphics(self, latex: str, x: float, y: float, max_width: float, line_height: float):
+        """Render inline math expression using MathGraphicsRenderer."""
+        try:
+            # Parse the LaTeX
+            parsed = self.math_parser.parse_expression(latex)
+            if parsed is None:
+                raise ValueError(f"Failed to parse math expression: {latex}")
+            
+            # Layout the math
+            layout = self.math_engine.layout(parsed)
+            
+            # Get current position for rendering
+            current_x = self.pdf.get_x()
+            current_y = self.pdf.get_y()
+            
+            # Convert fpdf2 coordinates to PDF coordinates for the renderer
+            pdf_y = self.page_height - current_y  # PDF coordinates from bottom
+            
+            # Render using MathGraphicsRenderer
+            commands, width = self.math_graphics.render_math_box(
+                layout, current_x, pdf_y, pdf_y  # baseline_y = pdf_y for inline
+            )
+            
+            # Execute the PDF commands
+            for command in commands:
+                self.pdf._out(command)
+            
+            # Move cursor forward by the rendered width
+            self.pdf.set_x(current_x + width)
+            
+            # Record in tracker
+            self.tracker.record_text(
+                x=current_x,
+                y=pdf_y,
+                width=width,
+                height=line_height,  # Approximate height
+                page=self.current_page,
+                label=f"inline_math_{latex[:10]}"
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"Inline math graphics rendering failed: {e}")
+            # Fallback to simple text
+            fallback_text = f"[{latex}]"
+            self.pdf.text(self.pdf.get_x(), self.pdf.get_y(), fallback_text)
+            self.pdf.set_x(self.pdf.get_x() + self.pdf.get_string_width(fallback_text))
             return False
 
     def _render_code_block_fpdf2(self, code_block: CodeBlock):

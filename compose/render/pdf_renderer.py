@@ -16,13 +16,13 @@ import zlib
 import base64
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
-from ..model.ast import Document, Heading, Paragraph, MathBlock, MathInline, CodeBlock, ListBlock, ListItem, Link, Image, Text, Bold, Italic, Strikethrough, CodeInline, Table
+from ..model.ast import Document, Heading, Paragraph, MathBlock, MathInline, CodeBlock, ListBlock, ListItem, Link, Image, Text, Bold, Italic, Strikethrough, CodeInline, Table, InlineElement
 from ..layout.box_model import MathBox, BoxType, Dimensions
 from ..layout.engines.math_engine import MathLayoutEngine, ExpressionLayout
 from ..layout.content.math_parser import MathExpressionParser
 from .rendering_tracker import RenderingTracker
 from .layout_measurer import LayoutMeasurer
-from .fpdf2_renderer import FPDF2Renderer
+from .math_graphics import MathGraphicsRenderer
 from ..cache_system import performance_monitor
 
 
@@ -83,6 +83,7 @@ class ProfessionalPDFRenderer:
         # Math rendering
         self.math_engine = MathLayoutEngine()
         self.math_parser = MathExpressionParser()
+        self.math_graphics = MathGraphicsRenderer(self)
 
         # Color support
         self.current_color = (0, 0, 0)  # RGB black
@@ -305,7 +306,7 @@ class ProfessionalPDFRenderer:
     @performance_monitor.time_operation("pdf_rendering")
     def render(self, doc: Document, config: Dict = None) -> bytes:
         """
-        Render document to professional PDF using FPDF2 for robust layout.
+        Render document to professional PDF using manual PDF generation.
 
         Args:
             doc: Document AST to render
@@ -316,21 +317,17 @@ class ProfessionalPDFRenderer:
         """
         config = config or {}
 
-        # Use FPDF2Renderer for robust rendering instead of manual PDF commands
-        renderer = FPDF2Renderer(
-            page_width=self.page_width,
-            page_height=self.page_height,
-            margin_left=self.margin_left,
-            margin_right=self.margin_right,
-            margin_top=self.margin_top,
-            margin_bottom=self.margin_bottom
-        )
+        # Apply configuration
+        self._apply_config(config)
 
-        # Apply configuration to the FPDF2Renderer
-        renderer._apply_config(config)
+        # Reset rendering state
+        self._reset_render_state()
 
-        # Render using FPDF2Renderer
-        return renderer.render(doc, config)
+        # Use the clean rendering pipeline
+        self._layout_document_clean(doc)
+
+        # Generate PDF manually
+        return self._generate_professional_pdf()
 
     def _apply_config(self, config: Dict):
         """Apply configuration settings."""
@@ -1035,13 +1032,16 @@ class ProfessionalPDFRenderer:
             elif isinstance(element, CodeInline):
                 result.append(f'`{element.content}`')
             elif isinstance(element, MathInline):
-                result.append(f'[{element.content.strip("$")}]')
+                # Return a special marker that will be detected during rendering
+                math_content = element.content.strip('$')
+                result.append(f"§MATH§{math_content}§MATH§")
             elif isinstance(element, Link):
                 result.append(element.text)
             else:
                 result.append(str(element))
 
-        return "".join(result)
+        final_result = "".join(result)
+        return final_result
 
     def _escape_pdf_text(self, text: str) -> str:
         """Escape text for PDF content streams."""
@@ -1504,8 +1504,10 @@ startxref
         if not text.strip():
             return y
 
-        # Apply typography
+        # Apply typography enhancements
         processed_text = self._apply_ligatures(text)
+
+        # Word wrap with proper line breaking
         lines = self._wrap_text(processed_text, self.page_width - self.margin_left - self.margin_right)
 
         # Get font metrics for proper bounding box
@@ -1515,37 +1517,321 @@ startxref
         text_height = ascender + descender
 
         for line in lines:
-            # Apply kerning
-            kerned_line = self._apply_kerning(line, self.current_font)
-            line_width = self.get_text_width(kerned_line, self.current_font, self.current_font_size)
-            line_top = y + ascender  # Top of text bounding box
+            # Check if we need a new page
+            if self.current_y < self.margin_bottom + self.current_font_size:
+                self._new_page_clean()
 
+            # Render line (handles inline math if present)
+            self._render_text_with_inline_math(line, y)
+
+            # Move down for next line
+            y -= self.current_font_size * self.line_height_factor
+
+        # Add paragraph spacing
+        self._add_spacing_between_blocks(self.paragraph_spacing)
+
+        # Return final Y position
+        return y
+
+    def _render_text_with_inline_math(self, line: str, y: float):
+        """Render a line of text that may contain inline math markers."""
+        import re
+
+        # Split line by math markers
+        parts = re.split(r'(§MATH§.*?§MATH§)', line)
+
+        current_x = self.margin_left
+
+        # Get font metrics for tracking
+        font_metrics = self.font_metrics.get("Helvetica", {})
+        ascender = font_metrics.get('ascent', self.current_font_size * 0.8) / 1000.0 * self.current_font_size
+        text_height = ascender + abs(font_metrics.get('descent', self.current_font_size * 0.2)) / 1000.0 * self.current_font_size
+        line_top = y + ascender
+
+        total_width = 0
+
+        for part in parts:
+            if part.startswith('§MATH§') and part.endswith('§MATH§'):
+                # This is a math marker
+                math_content = part[6:-6]  # Remove §MATH§ markers
+                try:
+                    math_width = self._render_inline_math_at_position(math_content, current_x, y)
+                except Exception as e:
+                    math_width = 50  # fallback width
+                current_x += math_width
+                total_width += math_width
+            elif part.strip():
+                # This is regular text
+                # Apply kerning
+                kerned_part = self._apply_kerning(part, "Helvetica")
+
+                commands = [
+                    "BT",
+                    "0 0 0 rg",
+                    f"/Helvetica {self.current_font_size} Tf",
+                    f"1 0 0 1 {current_x} {y} Tm",
+                    f"{self._to_pdf_literal(kerned_part)} Tj",
+                    "ET"
+                ]
+
+                self._add_to_current_page(commands)
+
+                part_width = self.get_text_width(kerned_part, "Helvetica", self.current_font_size)
+                current_x += part_width
+                total_width += part_width
+
+        # Record the entire line in tracker
+        self.tracker.record_text(
+            x=self.margin_left,
+            y=line_top,
+            width=total_width,
+            height=text_height,
+            page=self.current_page,
+            label=f"para_line_math_{line[:15]}"
+        )
+
+    def _render_inline_math_at_position(self, latex: str, x: float, y: float) -> float:
+        """Render inline math at a specific position and return its width."""
+        try:
+            # Parse the LaTeX
+            parsed = self.math_parser.parse_expression(latex)
+            if parsed is None:
+                raise ValueError(f"Failed to parse math expression: {latex}")
+            
+            # Layout the math
+            layout = self.math_engine.layout(parsed)
+            
+            # Convert PDF coordinates (Y from bottom) to our coordinate system (Y from top)
+            pdf_y = self.page_height - y  # Convert to PDF coordinates from bottom
+            
+            # Render using MathGraphicsRenderer
+            commands, width = self.math_graphics.render_math_box(
+                layout, x, pdf_y, pdf_y  # baseline_y = pdf_y for inline
+            )
+            
+            # Execute the PDF commands
+            self._add_to_current_page(commands)
+            
+            # Record in tracker
+            self.tracker.record_text(
+                x=x,
+                y=pdf_y,
+                width=width,
+                height=self.current_font_size,  # Approximate height
+                page=self.current_page,
+                label=f"inline_math_{latex[:10]}"
+            )
+            
+            return width
+            
+        except Exception as e:
+            # Fallback to placeholder text
+            fallback_text = f"[{latex}]"
+            fallback_width = self.get_text_width(fallback_text, "Helvetica", self.current_font_size)
+            
             commands = [
                 "BT",
                 "0 0 0 rg",
                 f"/Helvetica {self.current_font_size} Tf",
-                f"1 0 0 1 {self.margin_left} {y} Tm",
-                f"{self._to_pdf_literal(kerned_line)} Tj",
+                f"1 0 0 1 {x} {y} Tm",
+                f"{self._to_pdf_literal(fallback_text)} Tj",
                 "ET"
             ]
-
+            
             self._add_to_current_page(commands)
+            return fallback_width
 
-            # Record line in tracker with proper text bounds
-            self.tracker.record_text(
-                x=self.margin_left,
-                y=line_top,  # Top of text bounding box
-                width=line_width,
-                height=text_height,  # Actual text height, not line height
-                page=self.current_page,
-                label=f"para_line_{line[:15]}"
+    def _wrap_inline_elements(self, elements: List[InlineElement], max_width: float) -> List[List[InlineElement]]:
+        """Wrap inline elements into lines that fit within max_width."""
+        lines = []
+        current_line = []
+        current_width = 0
+
+        for element in elements:
+            element_width = self._get_inline_element_width(element)
+            
+            # If this element would exceed the line width and we have content, start new line
+            if current_line and current_width + element_width > max_width:
+                lines.append(current_line)
+                current_line = [element]
+                current_width = element_width
+            else:
+                current_line.append(element)
+                current_width += element_width
+
+        # Add the last line if it has content
+        if current_line:
+            lines.append(current_line)
+
+        return lines
+
+    def _get_inline_element_width(self, element: InlineElement) -> float:
+        """Get the width of an inline element."""
+        if isinstance(element, Text):
+            return self.get_text_width(element.content, "Helvetica", self.current_font_size)
+        elif isinstance(element, (Bold, Italic)):
+            # Calculate width of nested content
+            return sum(self._get_inline_element_width(child) for child in element.children)
+        elif isinstance(element, CodeInline):
+            # Code uses same font for now
+            return self.get_text_width(f'`{element.content}`', "Helvetica", self.current_font_size)
+        elif isinstance(element, MathInline):
+            # Estimate math width (this could be improved with actual math layout)
+            math_content = element.content.strip('$')
+            return self.get_text_width(f"[{math_content}]", "Helvetica", self.current_font_size)
+        elif isinstance(element, Link):
+            return self.get_text_width(element.text, "Helvetica", self.current_font_size)
+        else:
+            return 0
+
+    def _render_inline_elements_line(self, elements: List[InlineElement], y: float) -> float:
+        """Render a line of inline elements and return the total width."""
+        current_x = self.margin_left
+        total_width = 0
+
+        for element in elements:
+            if isinstance(element, Text):
+                text = self._apply_ligatures(element.content)
+                text = self._apply_kerning(text, "Helvetica")
+                text_width = self.get_text_width(text, "Helvetica", self.current_font_size)
+                
+                commands = [
+                    "BT",
+                    "0 0 0 rg",
+                    f"/Helvetica {self.current_font_size} Tf",
+                    f"1 0 0 1 {current_x} {y} Tm",
+                    f"{self._to_pdf_literal(text)} Tj",
+                    "ET"
+                ]
+                
+                self._add_to_current_page(commands)
+                current_x += text_width
+                total_width += text_width
+                
+            elif isinstance(element, (Bold, Italic)):
+                # Handle formatting (simplified - just render children)
+                for child in element.children:
+                    child_width = self._render_inline_element_at(child, current_x, y)
+                    current_x += child_width
+                    total_width += child_width
+                    
+            elif isinstance(element, CodeInline):
+                # Render code (simplified)
+                code_text = f'`{element.content}`'
+                code_width = self.get_text_width(code_text, "Helvetica", self.current_font_size)
+                
+                commands = [
+                    "BT",
+                    "0 0 0 rg",
+                    f"/Helvetica {self.current_font_size} Tf",
+                    f"1 0 0 1 {current_x} {y} Tm",
+                    f"{self._to_pdf_literal(code_text)} Tj",
+                    "ET"
+                ]
+                
+                self._add_to_current_page(commands)
+                current_x += code_width
+                total_width += code_width
+                
+            elif isinstance(element, MathInline):
+                # Render inline math using MathGraphicsRenderer
+                math_width = self._render_inline_math(element, current_x, y)
+                current_x += math_width
+                total_width += math_width
+                
+            elif isinstance(element, Link):
+                # Render link text (simplified)
+                link_width = self.get_text_width(element.text, "Helvetica", self.current_font_size)
+                
+                commands = [
+                    "BT",
+                    "0 0 0 rg",
+                    f"/Helvetica {self.current_font_size} Tf",
+                    f"1 0 0 1 {current_x} {y} Tm",
+                    f"{self._to_pdf_literal(element.text)} Tj",
+                    "ET"
+                ]
+                
+                self._add_to_current_page(commands)
+                current_x += link_width
+                total_width += link_width
+
+        return total_width
+
+    def _render_inline_element_at(self, element: InlineElement, x: float, y: float) -> float:
+        """Render a single inline element at the specified position and return its width."""
+        if isinstance(element, Text):
+            text = self._apply_ligatures(element.content)
+            text = self._apply_kerning(text, "Helvetica")
+            text_width = self.get_text_width(text, "Helvetica", self.current_font_size)
+            
+            commands = [
+                "BT",
+                "0 0 0 rg",
+                f"/Helvetica {self.current_font_size} Tf",
+                f"1 0 0 1 {x} {y} Tm",
+                f"{self._to_pdf_literal(text)} Tj",
+                "ET"
+            ]
+            
+            self._add_to_current_page(commands)
+            return text_width
+        else:
+            return 0
+
+    def _render_inline_math(self, math_inline: MathInline, x: float, y: float) -> float:
+        """Render inline math expression at the specified position and return its width."""
+        try:
+            # Parse the LaTeX
+            latex = math_inline.content.strip('$')
+            parsed = self.math_parser.parse_expression(latex)
+            if parsed is None:
+                raise ValueError(f"Failed to parse math expression: {latex}")
+            
+            # Layout the math
+            layout = self.math_engine.layout(parsed)
+            
+            # Convert PDF coordinates (Y from bottom) to our coordinate system (Y from top)
+            pdf_y = self.page_height - y  # Convert to PDF coordinates from bottom
+            
+            # Render using MathGraphicsRenderer
+            commands, width = self.math_graphics.render_math_box(
+                layout, x, pdf_y, pdf_y  # baseline_y = pdf_y for inline
             )
-
-            # Move down for next line by line height (not text height)
-            y -= self.current_font_size * self.line_height_factor
-
-        # Return final Y position
-        return y
+            
+            # Execute the PDF commands
+            self._add_to_current_page(commands)
+            
+            # Record in tracker
+            self.tracker.record_text(
+                x=x,
+                y=pdf_y,
+                width=width,
+                height=self.current_font_size,  # Approximate height
+                page=self.current_page,
+                label=f"inline_math_{latex[:10]}"
+            )
+            
+            return width
+            
+        except Exception as e:
+            print(f"Inline math rendering failed: {e}")
+            # Fallback to placeholder text
+            fallback_latex = math_inline.content.strip('$')
+            fallback_text = f"[{fallback_latex}]"
+            fallback_width = self.get_text_width(fallback_text, "Helvetica", self.current_font_size)
+            
+            commands = [
+                "BT",
+                "0 0 0 rg",
+                f"/Helvetica {self.current_font_size} Tf",
+                f"1 0 0 1 {x} {y} Tm",
+                f"{self._to_pdf_literal(fallback_text)} Tj",
+                "ET"
+            ]
+            
+            self._add_to_current_page(commands)
+            return fallback_width
 
     def _render_math_block(self, math_block: MathBlock, y: float) -> float:
         """Render math block at given Y position."""
@@ -1555,16 +1841,43 @@ startxref
         elif content.startswith('$') and content.endswith('$'):
             content = content[1:-1].strip()
 
-        # For now, render as simple text (placeholder)
+        # Try to render with MathGraphicsRenderer
+        try:
+            parsed = self.math_parser.parse_expression(content)
+            if parsed:
+                layout = self.math_engine.layout(parsed)
+                pdf_y = self.page_height - y
+                
+                commands, width = self.math_graphics.render_math_box(
+                    layout, self.margin_left, pdf_y, pdf_y
+                )
+                
+                self._add_to_current_page(commands)
+                
+                # Record in tracker
+                self.tracker.record_text(
+                    x=self.margin_left,
+                    y=pdf_y,
+                    width=width,
+                    height=self.current_font_size * 2,  # Approximate height
+                    page=self.current_page,
+                    label="math_block_graphics"
+                )
+                
+                return y - self.current_font_size * 2
+        except Exception as e:
+            pass
+        
+        # Fallback: render as simple text
         math_text = f"[MATH: {content}]"
-        center_x = self.page_width // 2
         text_width = self.get_text_width(math_text, "Helvetica", 12)
-
+        center_x = self.margin_left + (self.page_width - self.margin_left - self.margin_right) // 2
+        
         commands = [
             "BT",
             "0 0 0 rg",
             "/Helvetica 12 Tf",
-            f"1 0 0 1 {center_x - len(math_text)*3} {y - 12} Tm",
+            f"1 0 0 1 {center_x - text_width/2} {y - 12} Tm",
             f"{self._to_pdf_literal(math_text)} Tj",
             "ET"
         ]
@@ -1573,7 +1886,7 @@ startxref
 
         # Record in tracker
         self.tracker.record_text(
-            x=center_x - len(math_text)*3,
+            x=center_x - text_width/2,
             y=y,
             width=text_width,
             height=24,
@@ -1662,12 +1975,13 @@ startxref
         """Render table at given Y position."""
         # Simple text representation for now
         header_text = " | ".join(self._extract_text_content(cell) for cell in table.headers)
-        header_width = self.get_text_width(header_text, "Helvetica", 10)
+        header_width = self.get_text_width(header_text, "Helvetica", 12)
 
+        # Render header in bold/larger font
         commands = [
             "BT",
             "0 0 0 rg",
-            "/Helvetica 10 Tf",
+            "/Helvetica 12 Tf",
             f"1 0 0 1 {self.margin_left} {y} Tm",
             f"{self._to_pdf_literal(header_text)} Tj",
             "ET"
@@ -1680,15 +1994,15 @@ startxref
             x=self.margin_left,
             y=y,
             width=header_width,
-            height=12,
+            height=14,
             page=self.current_page,
             label="table_header"
         )
 
-        y -= 12
+        y -= 16
 
         # Separator
-        sep_text = "-" * 60
+        sep_text = "-" * min(80, len(header_text))
         commands = [
             "BT",
             "0 0 0 rg",
@@ -1699,17 +2013,17 @@ startxref
         ]
 
         self._add_to_current_page(commands)
-        y -= 12
+        y -= 14
 
         # Rows
         for row in table.rows:
             row_text = " | ".join(self._extract_text_content(cell) for cell in row)
-            row_width = self.get_text_width(row_text, "Helvetica", 10)
+            row_width = self.get_text_width(row_text, "Helvetica", 12)
 
             commands = [
                 "BT",
                 "0 0 0 rg",
-                "/Helvetica 10 Tf",
+                "/Helvetica 12 Tf",
                 f"1 0 0 1 {self.margin_left} {y} Tm",
                 f"{self._to_pdf_literal(row_text)} Tj",
                 "ET"
@@ -1722,12 +2036,12 @@ startxref
                 x=self.margin_left,
                 y=y,
                 width=row_width,
-                height=12,
+                height=14,
                 page=self.current_page,
                 label="table_row"
             )
 
-            y -= 12
+            y -= 16
 
         return y
 
