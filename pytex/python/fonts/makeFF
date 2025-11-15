@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+
+"""Python port of makeFF - Creates FontForge scripts for KaTeX fonts."""
+
+import sys
+import os
+from typing import Dict, List, Union, Any
+
+# Font mapping data
+FONT_MAP = {
+    "cmr10": {
+        "Main-Regular": {
+            # Greek letters
+            range(0, 2): 0x393,  # Gamma, Delta
+            2: 0x398,  # Theta
+            3: 0x39B,  # Lambda
+            4: 0x39E,  # Xi
+            5: 0x3A0,  # Pi
+            6: 0x3A3,  # Sigma
+            range(7, 9): 0x3A5,  # Upsilon, Phi
+            range(9, 11): 0x3A8,  # Psi, Omega
+
+            # Special characters
+            0x10: 0x131,  # i
+            0x11: 0x237,  # j
+            0x12: 0x2CB,  # grave
+            0x13: 0x2CA,  # acute
+            0x14: 0x2C7,  # check
+            0x15: 0x2D8,  # breve
+            0x16: 0x2C9,  # bar
+            0x17: [0xB0, -125, 0],  # degree
+            0x18: 0xB8,  # cedilla
+
+            # Punctuation and symbols
+            range(0x21, 0x30): lambda i: 0x21 + (i - 0x21),  # ! through /
+            0x22: 0x201D,  # "
+            0x27: 0x2019,  # '
+            range(0x30, 0x3A): lambda i: 0x30 + (i - 0x30),  # 0-9
+            range(0x3A, 0x3C): lambda i: 0x3A + (i - 0x3A),  # : ;
+            0x3D: 0x3D,  # =
+            range(0x3F, 0x41): lambda i: 0x3F + (i - 0x3F),  # ? @
+            range(0x41, 0x5B): lambda i: 0x41 + (i - 0x41),  # A-Z
+            0x5B: 0x5B,  # [
+            0x5C: 0x201C,  # ``
+            range(0x5D, 0x5F): lambda i: 0x5D + (i - 0x5D),  # ] ^
+            0x5E: 0x2C6,  # hat
+            0x5F: 0x2D9,  # dot
+            0x60: 0x2018,  # `
+            range(0x61, 0x7B): lambda i: 0x61 + (i - 0x61),  # a-z
+            range(0x7B, 0x7E): lambda i: 0x2013 + (i - 0x7B),  # endash, emdash
+            0x7B: [0x5F, 0, -310],  # underline
+            0x7D: 0x2DD,  # double acute
+            0x7E: [0x7E, 0, -350],  # ~
+            0x7E: 0x2DC,  # tilde
+            0x7F: 0xA8,  # ddot
+            0x19: 0xDF,  # sharp S
+            0x1A: 0xE6,  # ae ligature
+            0x1B: 0x153,  # oe ligature
+            0x1C: 0xF8,  # o with slash
+            0x1D: 0xC6,  # AE ligature
+            0x1E: 0x152,  # OE ligature
+            0x1F: 0xD8,  # O with slash
+        },
+    },
+
+    "cmmi10": {
+        "Math-Italic": {
+            # Greek letters
+            range(11, 14): lambda i: 0x3B1 + (i - 11),  # alpha, beta, gamma, delta
+            15: 0x3F5,  # epsilon
+            range(16, 24): lambda i: 0x3B6 + (i - 16),  # zeta through xi
+            range(25, 27): lambda i: 0x3C0 + (i - 25),  # pi, rho
+            range(27, 30): lambda i: 0x3C3 + (i - 27),  # sigma, tau, upsilon
+            30: 0x3D5,  # phi
+            range(31, 34): lambda i: 0x3C7 + (i - 31),  # chi, psi, omega
+            34: 0x3B5,  # varepsilon
+            35: 0x3D1,  # vartheta
+            36: 0x3D6,  # varpi
+            37: 0x3F1,  # varrho
+            38: 0x3C2,  # varsigma
+            39: 0x3C6,  # varphi
+
+            # Letters
+            range(65, 91): lambda i: 0x41 + (i - 65),  # A-Z
+            range(97, 123): lambda i: 0x61 + (i - 97),  # a-z
+            range(48, 58): lambda i: 0x30 + (i - 48),  # 0-9 (old style)
+
+            111: 0x3BF,  # omicron
+            123: 0xE131,  # imath
+            124: 0xE237,  # jmath
+        },
+
+        "Main-Regular": {
+            40: 0x21BC,  # leftharpoonup
+            41: 0x21BD,  # leftharpoondown
+            42: 0x21C0,  # rightharpoonup
+            43: 0x21C1,  # rightharpoondown
+
+            46: 0x25B9,  # triangleright
+            47: 0x25C3,  # triangleleft
+
+            58: 0x2E,  # .
+            59: 0x2C,  # ,
+
+            60: 0x3C,  # <
+            61: 0x2215,  # /
+            62: 0x3E,  # >
+
+            63: 0x22C6,  # star
+            64: 0x2202,  # partial
+
+            range(91, 94): lambda i: 0x266D + (i - 91),  # flat, natural, sharp
+            94: 0x2323,  # smile
+            95: 0x2322,  # frown
+            96: 0x2113,  # ell
+
+            125: 0x2118,  # wp
+            126: [0x20D7, -653, 0],  # vec
+        },
+    },
+
+    "cmsy10": {
+        "Main-Regular": {
+            range(0, 2): 0x2212,  # minus signs
+            1: 0x22C5,  # cdot
+            2: 0xD7,  # times
+            3: 0x2217,  # ast
+            4: 0xF7,  # div
+            5: 0x22C4,  # diamond
+            6: 0xB1,  # pm
+            7: 0x2213,  # mp
+            range(8, 13): lambda i: 0x2295 + (i - 8),  # oplus through odot
+            13: 0x25EF,  # bigcirc
+            range(14, 16): 0x2218,  # circ, bullet
+
+            16: 0x224D,  # asymp
+            17: 0x2261,  # equiv
+            range(18, 20): lambda i: 0x2286 + (i - 18),  # subseteq, supseteq
+            range(20, 22): lambda i: 0x2264 + (i - 20),  # leq, geq
+            range(22, 24): lambda i: 0x2AAF + (i - 22),  # preceq, succeq
+            24: 0x223C,  # sim
+            25: 0x2248,  # approx
+            range(26, 28): lambda i: 0x2282 + (i - 26),  # subset, supset
+            range(28, 30): lambda i: 0x226A + (i - 28),  # ll, gg
+            range(30, 32): lambda i: 0x227A + (i - 30),  # prec, succ
+
+            32: 0x2190,  # leftarrow
+            33: 0x2192,  # rightarrow
+            34: 0x2191,  # uparrow
+            35: 0x2193,  # downarrow
+            36: 0x2194,  # leftrightarrow
+            37: 0x2197,  # nearrow
+            38: 0x2198,  # searrow
+            39: 0x2243,  # simeq
+
+            40: 0x21D0,  # Leftarrow
+            41: 0x21D2,  # Rightarrow
+            42: 0x21D1,  # Uparrow
+            43: 0x21D3,  # Downarrow
+            44: 0x21D4,  # Leftrightarrow
+            45: 0x2196,  # nwarrow
+            46: 0x2199,  # swarrow
+            47: 0x221D,  # propto
+
+            48: 0x2032,  # prime
+            49: 0x221E,  # infty
+            50: 0x2208,  # in
+            51: 0x220B,  # ni
+            52: 0x25B3,  # triangle
+            53: 0x25BD,  # triangledown
+            54: 0xE020,  # not
+            56: 0x2200,  # forall
+            57: 0x2203,  # exists
+            58: 0xAC,  # neg
+            59: 0x2205,  # emptyset
+            60: 0x211C,  # Re
+            61: 0x2111,  # Im
+            62: 0x22A4,  # top
+            63: 0x22A5,  # bot
+
+            64: 0x2135,  # aleph
+
+            91: 0x222A,  # cup
+            92: 0x2229,  # cap
+            93: 0x228E,  # uplus
+            range(94, 97): lambda i: 0x2227 + (i - 94),  # wedge, vee
+
+            range(96, 98): lambda i: 0x22A2 + (i - 96),  # vdash, dashv
+            range(98, 100): lambda i: 0x230A + (i - 98),  # lfloor, rfloor
+            range(100, 102): lambda i: 0x2308 + (i - 100),  # lceil, rceil
+            102: 0x7B,  # {
+            103: 0x7D,  # }
+            range(104, 106): lambda i: 0x27E8 + (i - 104),  # langle, rangle
+            106: 0x7C,  # |
+            106: 0x2223,  # vert
+            107: 0x2225,  # Vert
+            108: 0x2195,  # updownarrow
+            109: 0x21D5,  # Updownarrow
+            110: 0x5C,  # backslash
+            110: 0x2216,  # setminus
+            111: 0x2240,  # wr
+
+            112: [0x221A, 0, 760],  # surd
+            113: 0x2A3F,  # amalg
+            114: 0x2207,  # nabla
+            115: 0x222B,  # int
+            116: 0x2294,  # sqcup
+            117: 0x2293,  # sqcap
+            range(118, 120): lambda i: 0x2291 + (i - 118),  # sqsubseteq, sqsupseteq
+
+            range(121, 123): lambda i: 0x2020 + (i - 121),  # dagger, ddagger
+
+            123: 0x2663,  # clubsuit
+            124: 0x2662,  # diamondsuit
+            125: 0x2661,  # heartsuit
+            126: 0x2660,  # spadesuit
+        },
+
+        "Caligraphic": {
+            range(65, 91): lambda i: 0x41 + (i - 65),  # A-Z
+        },
+    },
+}
+
+
+def generate_fontforge_script(font_name: str, variant_name: str, mapping: Dict[Any, Any]) -> str:
+    """Generate FontForge script for a font variant."""
+    script = [
+        "#!/usr/bin/fontforge",
+        f"# Script for {font_name} {variant_name}",
+        "",
+        "Open($1);",
+        "SelectAll();",
+        "DetachAndRemoveGlyphs();",
+        "",
+    ]
+
+    # Add glyphs
+    for key, value in mapping.items():
+        if isinstance(key, range):
+            for i in key:
+                glyph_value = value(i) if callable(value) else value
+                script.append(f"Select({i});")
+                script.append(f"SetUnicodeValue({glyph_value});")
+        else:
+            glyph_value = value(key) if callable(value) else value
+            if isinstance(glyph_value, list):
+                # Composite glyph
+                unicode_val, x_offset, y_offset = glyph_value
+                script.append(f"Select({key});")
+                script.append(f"SetUnicodeValue({unicode_val});")
+                if x_offset or y_offset:
+                    script.append(f"Move({x_offset}, {y_offset});")
+            else:
+                script.append(f"Select({key});")
+                script.append(f"SetUnicodeValue({glyph_value});")
+
+    script.extend([
+        "",
+        "SelectAll();",
+        "RemoveOverlap();",
+        "RoundToInt();",
+        "Save($2);",
+        "Quit();",
+    ])
+
+    return "\n".join(script)
+
+
+def main():
+    """Main function to generate FontForge scripts."""
+    if len(sys.argv) < 2:
+        print("Usage: ./makeFF", file=sys.stderr)
+        sys.exit(1)
+
+    # Load configuration
+    config_file = "custom.cfg.pl"
+    config = {}
+
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip("';")
+                    config[key] = value
+
+    # Create ff directory
+    os.makedirs("ff", exist_ok=True)
+
+    # Generate scripts for each font
+    for font_name, variants in FONT_MAP.items():
+        for variant_name, mapping in variants.items():
+            script = generate_fontforge_script(font_name, variant_name, mapping)
+            script_file = f"ff/{font_name}-{variant_name}.ff"
+            with open(script_file, 'w') as f:
+                f.write(script)
+            print(f"Generated {script_file}")
+
+
+if __name__ == "__main__":
+    main()

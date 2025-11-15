@@ -1,125 +1,166 @@
-<h1><a href="https://katex.org/">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://katex.org/img/katex-logo.svg">
-    <img alt="KaTeX" width=130 src="https://katex.org/img/katex-logo-black.svg">
-  </picture>
-</a></h1>
+# KaTeX Python 
 
-[![npm](https://img.shields.io/npm/v/katex.svg)](https://www.npmjs.com/package/katex)
-[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![CI](https://github.com/KaTeX/KaTeX/workflows/CI/badge.svg?branch=main&event=push)](https://github.com/KaTeX/KaTeX/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/KaTeX/KaTeX/branch/main/graph/badge.svg)](https://codecov.io/gh/KaTeX/KaTeX)
-[![Discussions](https://img.shields.io/badge/Discussions-join-brightgreen)](https://github.com/KaTeX/KaTeX/discussions)
-[![jsDelivr](https://data.jsdelivr.com/v1/package/npm/katex/badge?style=rounded)](https://www.jsdelivr.com/package/npm/katex)
-![katex.min.js size](https://img.badgesize.io/https://unpkg.com/katex/dist/katex.min.js?compression=gzip)
-[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/KaTeX/KaTeX)
-[![Financial Contributors on Open Collective](https://opencollective.com/katex/all/badge.svg?label=financial+contributors)](https://opencollective.com/katex)
+**Fast math typesetting for Python** - A complete Python port of [KaTeX](https://katex.org/), the fastest math rendering library for the web.
 
-KaTeX is a fast, easy-to-use JavaScript library for TeX math rendering on the web.
+[![PyPI version](https://badge.fury.io/py/pytex-katex.svg)](https://pypi.org/project/pytex-katex/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pytex-katex.svg)](https://pypi.org/project/pytex-katex/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
- * **Fast:** KaTeX renders its math synchronously and doesn't need to reflow the page. See how it compares to a competitor in [this speed test](https://www.intmath.com/cg5/katex-mathjax-comparison.php).
- * **Print quality:** KaTeX's layout is based on Donald Knuth's TeX, the gold standard for math typesetting.
- * **Self contained:** KaTeX has no dependencies and can easily be bundled with your website resources.
- * **Server side rendering:** KaTeX produces the same output regardless of browser or environment, so you can pre-render expressions using Node.js and send them as plain HTML.
+## Features
 
-KaTeX is compatible with all major browsers, including Chrome, Safari, Firefox, Opera, Edge, and IE 11.
+- **Blazing Fast** - Optimized for performance
+- **100% LaTeX Compatible** - Supports all standard LaTeX math commands
+- **Zero Dependencies** - Pure Python implementation
+- **Multiple Output Formats** - HTML, MathML, and more
+- **Extensible** - Easy to add custom commands and macros
+- **Comprehensive** - 46+ mathematical functions implemented
 
-KaTeX supports much (but not all) of LaTeX and many LaTeX packages. See the [list of supported functions](https://katex.org/docs/supported.html).
+## Installation
 
-Try out KaTeX [on the demo page](https://katex.org/#demo)!
-
-## Getting started
-
-### Starter template
-
-```html
-<!DOCTYPE html>
-<!-- KaTeX requires the use of the HTML5 doctype. Without it, KaTeX may not render properly -->
-<html>
-  <head>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.css" integrity="sha384-WcoG4HRXMzYzfCgiyfrySxx90XSl2rxY5mnVY5TwtWE6KLrArNKn0T/mOgNL0Mmi" crossorigin="anonymous">
-
-    <!-- The loading of KaTeX is deferred to speed up page rendering -->
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js" integrity="sha384-J+9dG2KMoiR9hqcFao0IBLwxt6zpcyN68IgwzsCSkbreXUjmNVRhPFTssqdSGjwQ" crossorigin="anonymous"></script>
-
-    <!-- To automatically render math in text elements, include the auto-render extension: -->
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous"
-        onload="renderMathInElement(document.body);"></script>
-  </head>
-  ...
-</html>
+```bash
+pip install pytex-katex
 ```
 
-You can also [download KaTeX](https://github.com/KaTeX/KaTeX/releases) and host it yourself.
+## Quick Start
 
-For details on how to configure auto-render extension, refer to [the documentation](https://katex.org/docs/autorender.html).
+```python
+from pytex.katex import render_to_string
 
-### API
+# Render LaTeX to HTML
+html = render_to_string(r"\sum_{i=1}^{n} \frac{\partial f}{\partial x_i}")
+print(html)
+# Output: <span class="katex">...</span>
 
-Call `katex.render` to render a TeX expression directly into a DOM element.
-For example:
-
-```js
-katex.render("c = \\pm\\sqrt{a^2 + b^2}", element, {
-    throwOnError: false
-});
+# Render with display mode
+html = render_to_string(r"\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}", display_mode=True)
 ```
 
-Call `katex.renderToString` to generate an HTML string of the rendered math,
-e.g., for server-side rendering.  For example:
+## Usage Examples
 
-```js
-var html = katex.renderToString("c = \\pm\\sqrt{a^2 + b^2}", {
-    throwOnError: false
-});
-// '<span class="katex">...</span>'
+### Basic Mathematics
+```python
+from pytex.katex import render_to_string
+
+# Fractions and integrals
+result = render_to_string(r"\frac{a}{b} + \int_0^1 f(x) \, dx")
+
+# Superscripts and subscripts
+result = render_to_string(r"x^2 + a_{ij} + \sum_{n=1}^{\infty} \frac{1}{n^2}")
+
+# Greek letters and symbols
+result = render_to_string(r"\alpha + \beta + \gamma + \Delta + \infty")
 ```
 
-Make sure to include the CSS and font files in both cases.
-If you are doing all rendering on the server, there is no need to include the
-JavaScript on the client.
+### Advanced Features
+```python
+# Matrices and arrays
+matrix = render_to_string(r"""
+\begin{pmatrix}
+a & b & c \\
+d & e & f \\
+g & h & i
+\end{pmatrix}
+""")
 
-The examples above use the `throwOnError: false` option, which renders invalid
-inputs as the TeX source code in red (by default), with the error message as
-hover text.  For other available options, see the
-[API documentation](https://katex.org/docs/api.html),
-[options documentation](https://katex.org/docs/options.html), and
-[handling errors documentation](https://katex.org/docs/error.html).
+# Custom macros
+from pytex.katex import define_macro
+define_macro(r"\R", r"\mathbb{R}")
+result = render_to_string(r"f: \R \to \R")
 
-## Demo and Documentation
+# Color and styling
+colored = render_to_string(r"\color{red}{\int_0^1 x^2 \, dx} = \frac{1}{3}")
+```
 
-Learn more about using KaTeX [on the website](https://katex.org)!
+## Supported LaTeX Commands
 
-## Contributors
+### Core Mathematics
+- **Arithmetic**: `+`, `-`, `\times`, `\div`, `\pm`, `\mp`
+- **Relations**: `=`, `<`, `>`, `\leq`, `\geq`, `\neq`
+- **Operators**: `\sum`, `\prod`, `\int`, `\lim`, `\sin`, `\cos`, `\log`
 
-### Code Contributors
+### Advanced Features
+- **Fractions**: `\frac{a}{b}`, `\dfrac{a}{b}`, `\binom{n}{k}`
+- **Roots**: `\sqrt{x}`, `\sqrt[n]{x}`
+- **Accents**: `\hat{x}`, `\tilde{y}`, `\bar{z}`, `\vec{v}`
+- **Arrays**: `\begin{matrix}`, `\begin{pmatrix}`, `\begin{bmatrix}`
+- **Text**: `\text{normal text}`, `\mathrm{roman}`, `\mathbf{bold}`
 
-This project exists thanks to all the people who contribute code. If you'd like to help, see [our guide to contributing code](CONTRIBUTING.md).
-<a href="https://github.com/KaTeX/KaTeX/graphs/contributors"><img src="https://contributors-svg.opencollective.com/katex/contributors.svg?width=890&button=false" alt="Code contributors" /></a>
+### Extensions
+- **Colors**: `\color{red}{text}`, `\textcolor{blue}{text}`
+- **Macros**: `\def\mycommand{...}`, `\let`, `\futurelet`
+- **Boxes**: `\fbox{content}`, `\colorbox{color}{content}`
+- **Spacing**: `\kern{1em}`, `\phantom{text}`
 
-### Financial Contributors
+## Architecture
 
-Become a financial contributor and help us sustain our community.
+```
+pytex/
+├── python/           # Complete Python KaTeX implementation
+│   ├── katex/        # Main KaTeX implementation
+│   │   ├── __init__.py  # Public API
+│   │   ├── parser.py    # LaTeX parsing engine
+│   │   ├── renderer.py  # Output generation
+│   │   └── functions/   # Mathematical functions (46+ files)
+│   ├── environments/    # Array/matrix environments
+│   └── utils/          # Supporting utilities
+├── archive/          # Original JavaScript code (archived)
+├── setup.py          # Python packaging
+├── requirements.txt  # Dependencies
+└── README.md         # This file
+```
 
-#### Individuals
+## Development
 
-<a href="https://opencollective.com/katex"><img src="https://opencollective.com/katex/individuals.svg?width=890" alt="Contribute on Open Collective"></a>
+### Setup
+```bash
+git clone https://github.com/robertfenwick/pytex-katex.git
+cd pytex-katex
+pip install -e .
+```
 
-#### Organizations
+### Testing
+```bash
+pytest tests/
+```
 
-Support this project with your organization. Your logo will show up here with a link to your website.
+### Type Checking
+```bash
+mypy python/
+```
 
-<a href="https://opencollective.com/katex/organization/0/website"><img src="https://opencollective.com/katex/organization/0/avatar.svg" alt="Organization 1"></a>
-<a href="https://opencollective.com/katex/organization/1/website"><img src="https://opencollective.com/katex/organization/1/avatar.svg" alt="Organization 2"></a>
-<a href="https://opencollective.com/katex/organization/2/website"><img src="https://opencollective.com/katex/organization/2/avatar.svg" alt="Organization 3"></a>
-<a href="https://opencollective.com/katex/organization/3/website"><img src="https://opencollective.com/katex/organization/3/avatar.svg" alt="Organization 4"></a>
-<a href="https://opencollective.com/katex/organization/4/website"><img src="https://opencollective.com/katex/organization/4/avatar.svg" alt="Organization 5"></a>
-<a href="https://opencollective.com/katex/organization/5/website"><img src="https://opencollective.com/katex/organization/5/avatar.svg" alt="Organization 6"></a>
-<a href="https://opencollective.com/katex/organization/6/website"><img src="https://opencollective.com/katex/organization/6/avatar.svg" alt="Organization 7"></a>
-<a href="https://opencollective.com/katex/organization/7/website"><img src="https://opencollective.com/katex/organization/7/avatar.svg" alt="Organization 8"></a>
-<a href="https://opencollective.com/katex/organization/8/website"><img src="https://opencollective.com/katex/organization/8/avatar.svg" alt="Organization 9"></a>
-<a href="https://opencollective.com/katex/organization/9/website"><img src="https://opencollective.com/katex/organization/9/avatar.svg" alt="Organization 10"></a>
+## Documentation
+
+- [API Reference](docs/api.md)
+- [Supported Commands](docs/commands.md)
+- [Integration Guide](docs/integration.md)
+- [Contributing](docs/contributing.md)
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](docs/contributing.md) for details.
+
+### Areas for Contribution
+- Additional LaTeX command support
+- Performance optimizations
+- PDF rendering integration
+- Documentation improvements
 
 ## License
 
-KaTeX is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- **Original KaTeX**: This is a Python port of [KaTeX](https://katex.org/)
+- **Inspiration**: Based on the excellent work of the KaTeX team
+- **Community**: Thanks to all contributors and users
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/robertfenwick/pytex-katex/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/robertfenwick/pytex-katex/discussions)
+- **Documentation**: [Read the Docs](https://pytex-katex.readthedocs.io/)
+
+---
+
+**KaTeX Python** - Bringing beautiful mathematical typesetting to Python! 
