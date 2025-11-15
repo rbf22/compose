@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..define_function import define_function
 from ..parse_error import ParseError
 from ..parse_node import assert_node_type
 
 if TYPE_CHECKING:
-    from ..parse_node import ParseNode
+    from ..parse_node import OrdgroupParseNode, ParseNode, TextordParseNode
 
 
 # \@char function for creating characters from Unicode code points
@@ -25,14 +25,14 @@ define_function({
 
 
 def _char_handler(context: Dict[str, Any], args: List["ParseNode"]) -> Dict[str, Any]:
-    """Handler for \@char command that creates characters from code points."""
-    arg = assert_node_type(args[0], "ordgroup")
+    r"""Handler for \@char command that creates characters from code points."""
+    arg = cast("OrdgroupParseNode", assert_node_type(args[0], "ordgroup"))
     group = arg["body"]
 
     # Build the number string from the argument
     number_str = ""
     for node in group:
-        text_node = assert_node_type(node, "textord")
+        text_node = cast("TextordParseNode", assert_node_type(node, "textord"))
         number_str += text_node["text"]
 
     # Parse the code point

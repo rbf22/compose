@@ -1,19 +1,20 @@
 """Comprehensive tests for KaTeX Python implementation."""
 
 import pytest
+from typing import List, Any
 
 
 class TestKaTeXImport:
     """Test module import and basic functionality."""
 
-    def test_module_import(self):
+    def test_module_import(self) -> None:
         """Test that we can import the main katex module."""
         # This should work even with placeholder implementation
         import pytex.katex as katex
         assert hasattr(katex, 'render_to_string')
         assert hasattr(katex, 'render')
 
-    def test_module_attributes(self):
+    def test_module_attributes(self) -> None:
         """Test that the module has expected attributes."""
         import pytex.katex as katex
 
@@ -30,7 +31,7 @@ class TestKaTeXImport:
 class TestKaTeXRendering:
     """Test KaTeX rendering functionality."""
 
-    def test_render_to_string_basic(self):
+    def test_render_to_string_basic(self) -> None:
         """Test basic render_to_string functionality."""
         import pytex.katex as katex
 
@@ -39,7 +40,7 @@ class TestKaTeXRendering:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_render_to_string_with_options(self):
+    def test_render_to_string_with_options(self) -> None:
         """Test render_to_string with options."""
         import pytex.katex as katex
 
@@ -47,7 +48,7 @@ class TestKaTeXRendering:
         result = katex.render_to_string("x + y", {"display_mode": True})
         assert isinstance(result, str)
 
-    def test_render_to_string_complex(self):
+    def test_render_to_string_complex(self) -> None:
         """Test render_to_string with complex LaTeX."""
         import pytex.katex as katex
 
@@ -64,7 +65,7 @@ class TestKaTeXRendering:
             assert isinstance(result, str)
             assert len(result) > 0
 
-    def test_render_function_exists(self):
+    def test_render_function_exists(self) -> None:
         """Test that render function exists (for web compatibility)."""
         import pytex.katex as katex
 
@@ -75,12 +76,12 @@ class TestKaTeXRendering:
 class TestKaTeXMacros:
     """Test macro definition and usage."""
 
-    def test_define_macro_exists(self):
+    def test_define_macro_exists(self) -> None:
         """Test that define_macro function exists."""
         import pytex.katex as katex
         assert callable(katex.define_macro)
 
-    def test_define_macro_basic(self):
+    def test_define_macro_basic(self) -> None:
         """Test basic macro definition."""
         import pytex.katex as katex
 
@@ -88,7 +89,7 @@ class TestKaTeXMacros:
         katex.define_macro(r"\RR", r"\mathbb{R}")
         # In current implementation, this is a no-op, but should not fail
 
-    def test_define_function_exists(self):
+    def test_define_function_exists(self) -> None:
         """Test that define_function exists."""
         import pytex.katex as katex
         assert callable(katex.define_function)
@@ -97,14 +98,14 @@ class TestKaTeXMacros:
 class TestKaTeXErrorHandling:
     """Test error handling in KaTeX."""
 
-    def test_render_to_string_empty(self):
+    def test_render_to_string_empty(self) -> None:
         """Test rendering empty string."""
         import pytex.katex as katex
 
         result = katex.render_to_string("")
         assert isinstance(result, str)
 
-    def test_render_to_string_none_input(self):
+    def test_render_to_string_none_input(self) -> None:
         """Test handling of None input."""
         import pytex.katex as katex
 
@@ -128,7 +129,7 @@ class TestKaTeXMathematicalExpressions:
         (r"\leq", "less or equal"),
         (r"\neq", "not equal"),
     ])
-    def test_mathematical_symbols(self, expression, description):
+    def test_mathematical_symbols(self, expression: str, description: str) -> None:
         """Test various mathematical symbols and expressions."""
         import pytex.katex as katex
 
@@ -140,7 +141,7 @@ class TestKaTeXMathematicalExpressions:
 class TestKaTeXIntegration:
     """Integration tests for KaTeX functionality."""
 
-    def test_multiple_expressions(self):
+    def test_multiple_expressions(self) -> None:
         """Test rendering multiple expressions in sequence."""
         import pytex.katex as katex
 
@@ -156,7 +157,7 @@ class TestKaTeXIntegration:
             assert isinstance(result, str)
             assert len(result) > 0
 
-    def test_display_mode_variations(self):
+    def test_display_mode_variations(self) -> None:
         """Test different display mode options."""
         import pytex.katex as katex
 
@@ -176,7 +177,7 @@ class TestKaTeXIntegration:
 
 # Fixtures for more complex tests
 @pytest.fixture
-def sample_expressions():
+def sample_expressions() -> List[str]:
     """Provide sample LaTeX expressions for testing."""
     return [
         r"x + y = z",
@@ -188,7 +189,7 @@ def sample_expressions():
 
 
 @pytest.fixture
-def katex_module():
+def katex_module() -> Any:
     """Provide the katex module for testing."""
     import pytex.katex as katex
     return katex

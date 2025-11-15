@@ -96,7 +96,7 @@ class Options:
     # ------------------------------------------------------------------
     # Factory helpers
 
-    def _clone(self, **overrides) -> "Options":
+    def _clone(self, **overrides: Any) -> "Options":
         params = {
             "style": overrides.get("style", self.style),
             "color": overrides.get("color", self.color),
@@ -113,7 +113,7 @@ class Options:
         clone = Options(**params)
         return clone
 
-    def extend(self, **extension) -> "Options":
+    def extend(self, **extension: Any) -> "Options":
         return self._clone(**extension)
 
     # ------------------------------------------------------------------

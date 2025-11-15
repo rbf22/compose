@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, List, cast
 
 from ..build_common import make_fragment
 from ..define_function import define_function, ordargument
-from ..style import Style, STYLES
+from ..style import STYLES
 
 # Import style constants for easier access
 DISPLAY, DISPLAY_CRAMPED, TEXT, TEXT_CRAMPED, SCRIPT, SCRIPT_CRAMPED, SCRIPTSCRIPT, SCRIPTSCRIPT_CRAMPED = STYLES

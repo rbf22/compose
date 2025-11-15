@@ -18,7 +18,7 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for color group."""
     from .. import build_html as html
 
-    color_group = cast("ColorParseNode", group)
+    color_group: ColorParseNode = cast("ColorParseNode", group)
     # Build expression with color applied
     elements = html.build_expression(
         color_group["body"],
@@ -34,7 +34,7 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for color group."""
     from .. import build_mathml as mml
 
-    color_group = cast("ColorParseNode", group)
+    color_group: ColorParseNode = cast("ColorParseNode", group)
     # Build expression with color applied
     inner = mml.build_expression(color_group["body"], options.with_color(color_group["color"]))
 

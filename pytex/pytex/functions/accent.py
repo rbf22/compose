@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..build_common import make_ord, make_span, make_v_list, static_svg
 from ..define_function import define_function, normalize_argument
@@ -16,38 +16,46 @@ if TYPE_CHECKING:
     from ..parse_node import AccentParseNode, ParseNode
 
 
+def is_accent_node(node: Any) -> bool:
+    """Check if a node is an accent node."""
+    return (isinstance(node, dict) and
+            node.get("type") == "accent" and
+            "base" in node and
+            "label" in node)
+
 def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for accent group."""
     from .. import build_html as html
     from ..dom_tree import assert_symbol_dom_node
 
-    accent_group = cast("AccentParseNode", group)
+    # Handle the supsub case where accent is nested
+    supsub_group = None
 
-    # Handle supsub delegation
-    if accent_group.get("type") == "supsub":
-        # Accent with sup/subscripts - complex delegation logic
-        accent_group = accent_group["base"]  # The accent is in the base
+    if (isinstance(group, dict) and group.get("type") == "supsub" and
+        isinstance(group.get("base"), dict) and is_accent_node(group["base"])):
+        # Extract the accent from the supsub
+        accent_group = group["base"]
         base = accent_group["base"]
 
-        # Temporarily replace supsub base with accent base
-        original_base = group["base"]
-        group["base"] = base
-
-        # Build the supsub with the accent base
-        supsub_group = html.build_group(group, options)
-
-        # Restore original structure
-        group["base"] = original_base
-
-        group = accent_group
+        # Build the supsub with accent temporarily removed
+        temp_group = {**group, "base": base}
+        supsub_group = html.build_group(temp_group, options)
+    elif is_accent_node(group):
+        # Normal accent case
+        accent_group = group
+        base = accent_group["base"]
     else:
-        base = accent_group["base"]
+        # Fallback - shouldn't happen in normal operation
+        accent_group = cast(Any, group)
+        base = accent_group.get("base")
 
     # Build the base group with cramped style
     body = html.build_group(base, options.having_cramped_style())
 
     # Check if accent needs to shift for character skew
-    must_shift = accent_group.get("isShifty", False) and is_character_box(base)
+    must_shift = (isinstance(accent_group, dict) and
+                  accent_group.get("isShifty", False) and
+                  is_character_box(base))
 
     # Calculate skew
     skew = 0
@@ -56,7 +64,8 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         base_group = html.build_group(base_char, options.having_cramped_style())
         skew = assert_symbol_dom_node(base_group).skew
 
-    accent_below = accent_group["label"] == "\\c"
+    accent_below = (isinstance(accent_group, dict) and
+                    accent_group.get("label") == "\\c")
 
     # Calculate clearance between body and accent
     if accent_below:
@@ -65,15 +74,19 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         clearance = min(body.height, options.font_metrics().get("xHeight", 0.4))
 
     # Build the accent
-    if not accent_group.get("isStretchy", False):
+    is_stretchy = (isinstance(accent_group, dict) and
+                   accent_group.get("isStretchy", False))
+    if not is_stretchy:
         # Non-stretchy accent
-        if accent_group["label"] == "\\vec":
+        label = accent_group.get("label", "") if isinstance(accent_group, dict) else ""
+        if label == "\\vec":
             accent = static_svg("vec", options)
             width = 0.471  # From svgData.vec[1]
         else:
+            mode = accent_group.get("mode", "math") if isinstance(accent_group, dict) else "math"
             accent = make_ord({
-                "mode": accent_group["mode"],
-                "text": accent_group["label"]
+                "mode": mode,
+                "text": label
             }, options, "textord")
             accent = assert_symbol_dom_node(accent)
             accent.italic = 0  # Remove italic correction
@@ -84,7 +97,7 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         accent_body = make_span(["accent-body"], [accent])
 
         # Handle full accents (like \textcircled)
-        accent_full = accent_group["label"] == "\\textcircled"
+        accent_full = label == "\\textcircled"
         if accent_full:
             accent_body.classes.append("accent-full")
             clearance = body.height
@@ -97,7 +110,7 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         accent_body.style["left"] = make_em(left)
 
         # Special adjustment for \textcircled
-        if accent_group["label"] == "\\textcircled":
+        if label == "\\textcircled":
             accent_body.style["top"] = ".2em"
 
         accent_body = make_v_list({
@@ -136,7 +149,7 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     accent_wrap = make_span(["mord", "accent"], [accent_body], options)
 
     # Handle supsub case
-    if 'supsub_group' in locals():
+    if supsub_group is not None:
         # Replace base child with our accent
         supsub_group.children[0] = accent_wrap
         supsub_group.height = max(accent_wrap.height, supsub_group.height)
@@ -151,7 +164,7 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     from .. import build_mathml as mml
     from ..stretchy import math_ml_node
 
-    accent_group = cast("AccentParseNode", group)
+    accent_group: Any = group
     if accent_group.get("isStretchy", False):
         accent_node = math_ml_node(accent_group["label"])
     else:
@@ -209,7 +222,7 @@ define_function({
 })
 
 
-def _accent_handler(context, args, is_text_accent):
+def _accent_handler(context: Dict[str, Any], args: List[Any], is_text_accent: bool) -> Dict[str, Any]:
     """Handler for accent commands."""
     import re
 

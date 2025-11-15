@@ -70,9 +70,12 @@ def html_builder(group: ParseNode, options: "Options") -> DomSpan:
     has_limits = False
 
     if operatorname_group.get("type") == "supsub":
-        sup_group = operatorname_group.get("sup")
-        sub_group = operatorname_group.get("sub")
-        base_group = cast(Mapping[str, Any], operatorname_group.get("base", operatorname_group))
+        sup_val = operatorname_group.get("sup")
+        sub_val = operatorname_group.get("sub")
+        base_val = operatorname_group.get("base", operatorname_group)
+        sup_group = cast(Optional[ParseNode], sup_val)
+        sub_group = cast(Optional[ParseNode], sub_val)
+        base_group = cast(Mapping[str, Any], base_val)
         has_limits = True
 
     body_nodes = _normalize_operator_body(base_group)

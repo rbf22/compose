@@ -11,8 +11,7 @@ from ..parse_node import assert_node_type
 from ..units import calculate_size
 
 if TYPE_CHECKING:
-    from ..options import Options
-    from ..parse_node import KernParseNode, ParseNode
+    from ..parse_node import KernParseNode
 
 
 # Define kern/spacing commands

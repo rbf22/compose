@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, cast
 
 from ..define_function import define_function, normalize_argument
 from ..utils import is_character_box
@@ -23,7 +23,7 @@ def _as_font_name(font_command: str) -> str:
 try:
     from .mclass import binrel_class
 except ImportError:  # pragma: no cover - fallback for partial ports
-    def _binrel_class(body: AnyParseNode) -> str:
+    def _binrel_class(arg: AnyParseNode) -> str:
         """Fallback binrel class function."""
         return "mord"
 
@@ -35,9 +35,9 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     from .. import build_html as html
 
     font_group = cast("FontParseNode", group)
-    font_name = str(font_group.get("font", ""))
+    font_name = font_group.get("font", "")
     new_options = options.with_font(font_name)
-    return html.build_group(font_group.get("body"), new_options)
+    return html.build_expression(font_group["body"], new_options, True)
 
 
 def mathml_builder(group: ParseNode, options: "Options") -> Any:
@@ -45,9 +45,9 @@ def mathml_builder(group: ParseNode, options: "Options") -> Any:
     from .. import build_mathml as mml
 
     font_group = cast("FontParseNode", group)
-    font_name = str(font_group.get("font", ""))
+    font_name = font_group.get("font", "")
     new_options = options.with_font(font_name)
-    return mml.build_group(font_group.get("body"), new_options)
+    return mml.build_expression(font_group["body"], new_options)
 
 
 # Font aliases

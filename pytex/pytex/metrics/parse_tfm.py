@@ -1,5 +1,10 @@
+from __future__ import annotations
+
+from typing import List, Dict, Optional, Tuple, BinaryIO
+
+
 class CharInfoWord(object):
-    def __init__(self, word):
+    def __init__(self, word: int) -> None:
         b1, b2, b3, b4 = (word >> 24,
                           (word & 0xff0000) >> 16,
                           (word & 0xff00) >> 8,
@@ -12,18 +17,18 @@ class CharInfoWord(object):
         self.tag = b3 & 0b11
         self.remainder = b4
 
-    def has_ligkern(self):
+    def has_ligkern(self) -> bool:
         return self.tag == 1
 
-    def ligkern_start(self):
+    def ligkern_start(self) -> int:
         return self.remainder
 
 
 class LigKernProgram(object):
-    def __init__(self, program):
+    def __init__(self, program: List[Tuple[int, int, int, int]]) -> None:
         self.program = program
 
-    def execute(self, start, next_char):
+    def execute(self, start: int, next_char: int) -> Optional[int]:
         curr_instruction = start
         while True:
             instruction = self.program[curr_instruction]
@@ -42,7 +47,7 @@ class LigKernProgram(object):
 
 
 class TfmCharMetrics(object):
-    def __init__(self, width, height, depth, italic, kern_table):
+    def __init__(self, width: float, height: float, depth: float, italic: float, kern_table: Dict[int, float]) -> None:
         self.width = width
         self.height = height
         self.depth = depth
@@ -51,9 +56,9 @@ class TfmCharMetrics(object):
 
 
 class TfmFile(object):
-    def __init__(self, start_char, end_char, char_info, width_table,
-                 height_table, depth_table, italic_table, ligkern_table,
-                 kern_table):
+    def __init__(self, start_char: int, end_char: int, char_info: List[CharInfoWord], width_table: List[float],
+                 height_table: List[float], depth_table: List[float], italic_table: List[float], ligkern_table: List[Tuple[int, int, int, int]],
+                 kern_table: List[float]) -> None:
         self.start_char = start_char
         self.end_char = end_char
         self.char_info = char_info
@@ -64,7 +69,7 @@ class TfmFile(object):
         self.ligkern_program = LigKernProgram(ligkern_table)
         self.kern_table = kern_table
 
-    def get_char_metrics(self, char_num, fix_rsfs=False):
+    def get_char_metrics(self, char_num: int, fix_rsfs: bool = False) -> TfmCharMetrics:
         """Return glyph metrics for a unicode code point.
 
         Arguments:
@@ -96,25 +101,25 @@ class TfmFile(object):
 
 
 class TfmReader(object):
-    def __init__(self, f):
+    def __init__(self, f: BinaryIO) -> None:
         self.f = f
 
-    def read_byte(self):
+    def read_byte(self) -> int:
         return ord(self.f.read(1))
 
-    def read_halfword(self):
+    def read_halfword(self) -> int:
         b1 = self.read_byte()
         b2 = self.read_byte()
         return (b1 << 8) | b2
 
-    def read_word(self):
+    def read_word(self) -> int:
         b1 = self.read_byte()
         b2 = self.read_byte()
         b3 = self.read_byte()
         b4 = self.read_byte()
         return (b1 << 24) | (b2 << 16) | (b3 << 8) | b4
 
-    def read_fixword(self):
+    def read_fixword(self) -> float:
         word = self.read_word()
 
         neg = False
@@ -124,13 +129,13 @@ class TfmReader(object):
 
         return (-1 if neg else 1) * word / float(1 << 20)
 
-    def read_bcpl(self, length):
+    def read_bcpl(self, length: int) -> bytes:
         str_length = self.read_byte()
         data = self.f.read(length - 1)
         return data[:str_length]
 
 
-def read_tfm_file(file_name):
+def read_tfm_file(file_name: str) -> TfmFile:
     with open(file_name, 'rb') as f:
         reader = TfmReader(f)
 

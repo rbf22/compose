@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, TypedDict
 
+from .options import Options
 from .parse_error import ParseError
 
 
@@ -34,22 +35,22 @@ def valid_unit(unit: str) -> bool:
     return unit in PT_PER_UNIT or unit in RELATIVE_UNITS
 
 
-def calculate_size(size_value: Dict[str, float], options) -> float:
+def calculate_size(size_value: Measurement, options: Options) -> float:
     number = size_value["number"]
     unit = size_value["unit"]
 
     if unit in PT_PER_UNIT:
-        scale = PT_PER_UNIT[unit] / options.font_metrics().ptPerEm / options.size_multiplier
+        scale = PT_PER_UNIT[unit] / options.font_metrics()["ptPerEm"] / options.size_multiplier
     elif unit == "mu":
-        scale = options.font_metrics().cssEmPerMu
+        scale = options.font_metrics()["cssEmPerMu"]
     elif unit == "ex":
         unit_options = options.having_style(options.style.text()) if options.style.is_tight() else options
-        scale = unit_options.font_metrics().xHeight
+        scale = unit_options.font_metrics()["xHeight"]
         if unit_options is not options:
             scale *= unit_options.size_multiplier / options.size_multiplier
     elif unit == "em":
         unit_options = options.having_style(options.style.text()) if options.style.is_tight() else options
-        scale = unit_options.font_metrics().quad
+        scale = unit_options.font_metrics()["quad"]
         if unit_options is not options:
             scale *= unit_options.size_multiplier / options.size_multiplier
     else:

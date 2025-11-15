@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 from ..define_function import define_function
 from ..parse_error import ParseError
 
 if TYPE_CHECKING:
-    from ..parse_node import ParseNode
+    pass
 
 
 # Math mode delimiters - switching from text mode to math mode
@@ -36,8 +36,8 @@ define_function({
 })
 
 
-def _math_delimiter_handler(context, args) -> ParseNode:
-    """Handler for opening math delimiters (\(, $)."""
+def _math_delimiter_handler(context, args) -> Dict[str, Any]:
+    r"""Handler for opening math delimiters (\(, $)."""
     func_name = context["funcName"]
     parser = context["parser"]
 
@@ -61,6 +61,6 @@ def _math_delimiter_handler(context, args) -> ParseNode:
 
 
 def _closing_delimiter_handler(context, args) -> None:
-    """Handler for closing math delimiters (\), \]) - throws error for mismatches."""
+    r"""Handler for closing math delimiters (\), \]) - throws error for mismatches."""
     func_name = context["funcName"]
     raise ParseError(f"Mismatched {func_name}")

@@ -66,7 +66,7 @@ define_function({
 
 
 def _phantom_html_builder(group: ParseNode, options: "Options") -> Any:
-    """Build HTML for \phantom."""
+    r"""Build HTML for \phantom."""
     from .. import build_html as html
 
     phantom_group = cast("PhantomParseNode", group)
@@ -81,7 +81,7 @@ def _phantom_html_builder(group: ParseNode, options: "Options") -> Any:
 
 
 def _phantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
-    """Build MathML for \phantom."""
+    r"""Build MathML for \phantom."""
     from .. import build_mathml as mml
 
     phantom_group = cast("PhantomParseNode", group)
@@ -90,7 +90,7 @@ def _phantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
 
 def _hphantom_html_builder(group: ParseNode, options: "Options") -> Any:
-    """Build HTML for \hphantom."""
+    r"""Build HTML for \hphantom."""
     from .. import build_html as html
 
     hphantom_group = cast("HphantomParseNode", group)
@@ -117,7 +117,7 @@ def _hphantom_html_builder(group: ParseNode, options: "Options") -> Any:
 
 
 def _hphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
-    """Build MathML for \hphantom."""
+    r"""Build MathML for \hphantom."""
     from .. import build_mathml as mml
 
     hphantom_group = cast("HphantomParseNode", group)
@@ -130,7 +130,7 @@ def _hphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
 
 def _vphantom_html_builder(group: ParseNode, options: "Options") -> Any:
-    """Build HTML for \vphantom."""
+    r"""Build HTML for \vphantom."""
     from .. import build_html as html
 
     vphantom_group = cast("VphantomParseNode", group)
@@ -144,7 +144,7 @@ def _vphantom_html_builder(group: ParseNode, options: "Options") -> Any:
 
 
 def _vphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
-    """Build MathML for \vphantom."""
+    r"""Build MathML for \vphantom."""
     from .. import build_mathml as mml
 
     vphantom_group = cast("VphantomParseNode", group)

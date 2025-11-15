@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from ..define_function import define_function
 from ..parse_error import ParseError
 from ..parse_node import assert_node_type
 
 if TYPE_CHECKING:
-    from ..parse_node import ParseNode
+    pass
 
 # Global map for prefix handling
 GLOBAL_MAP = {
@@ -105,7 +105,7 @@ define_function({
 })
 
 
-def _prefix_handler(context) -> ParseNode:
+def _prefix_handler(context) -> Dict[str, Any]:
     """Handler for global/long prefixes."""
     parser = context["parser"]
     func_name = context["funcName"]
@@ -122,7 +122,7 @@ def _prefix_handler(context) -> ParseNode:
     raise ParseError("Invalid token after macro prefix", token)
 
 
-def _def_handler(context) -> ParseNode:
+def _def_handler(context) -> Dict[str, Any]:
     """Handler for macro definitions (\def, \gdef, \edef, \xdef)."""
     parser = context["parser"]
     func_name = context["funcName"]
@@ -188,7 +188,7 @@ def _def_handler(context) -> ParseNode:
     }
 
 
-def _let_handler(context) -> ParseNode:
+def _let_handler(context) -> Dict[str, Any]:
     """Handler for \let assignments."""
     parser = context["parser"]
     func_name = context["funcName"]
@@ -205,7 +205,7 @@ def _let_handler(context) -> ParseNode:
     }
 
 
-def _futurelet_handler(context) -> ParseNode:
+def _futurelet_handler(context) -> Dict[str, Any]:
     """Handler for \futurelet assignments."""
     parser = context["parser"]
     func_name = context["funcName"]

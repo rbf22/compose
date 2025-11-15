@@ -79,7 +79,7 @@ ParseNode = AnyParseNode
 try:
     from .symbols_data import NON_ATOMS
 except ImportError:
-    NON_ATOMS = set()
+    NON_ATOMS = {}
 
 # Placeholder for environment types
 AlignSpec = Any
@@ -96,7 +96,7 @@ class BaseParseNode(TypedDict):
 
 # Complex node types
 class ArrayParseNode(BaseParseNode):
-    type: str  # "array"
+
     colSeparationType: Optional[ColSeparationType]
     hskipBeforeAndAfter: Optional[bool]
     addJot: Optional[bool]
@@ -111,29 +111,29 @@ class ArrayParseNode(BaseParseNode):
 
 
 class CdlabelParseNode(BaseParseNode):
-    type: str  # "cdlabel"
+
     side: str
     label: AnyParseNode
 
 
 class CdlabelparentParseNode(BaseParseNode):
-    type: str  # "cdlabelparent"
+
     fragment: AnyParseNode
 
 
 class ColorParseNode(BaseParseNode):
-    type: str  # "color"
+
     color: str
     body: List[AnyParseNode]
 
 
 class ColorTokenParseNode(BaseParseNode):
-    type: str  # "color-token"
+
     color: str
 
 
 class OpParseNode(BaseParseNode):
-    type: str  # "op"
+
     limits: bool
     alwaysHandleSupSub: Optional[bool]
     suppressBaseShift: Optional[bool]
@@ -144,54 +144,54 @@ class OpParseNode(BaseParseNode):
 
 
 class OrdgroupParseNode(BaseParseNode):
-    type: str  # "ordgroup"
+
     body: List[AnyParseNode]
     semisimple: Optional[bool]
 
 
 class RawParseNode(BaseParseNode):
-    type: str  # "raw"
+
     string: str
 
 
 class SizeParseNode(BaseParseNode):
-    type: str  # "size"
+
     value: Measurement
     isBlank: bool
 
 
 class StylingParseNode(BaseParseNode):
-    type: str  # "styling"
+
     style: StyleStr
     body: List[AnyParseNode]
 
 
 class SupsubParseNode(BaseParseNode):
-    type: str  # "supsub"
+
     base: Optional[AnyParseNode]
     sup: Optional[AnyParseNode]
     sub: Optional[AnyParseNode]
 
 
 class TagParseNode(BaseParseNode):
-    type: str  # "tag"
+
     body: List[AnyParseNode]
     tag: List[AnyParseNode]
 
 
 class TextParseNode(BaseParseNode):
-    type: str  # "text"
+
     body: List[AnyParseNode]
     font: Optional[str]
 
 
 class UrlParseNode(BaseParseNode):
-    type: str  # "url"
+
     url: str
 
 
 class VerbParseNode(BaseParseNode):
-    type: str  # "verb"
+
     body: str
     star: bool
 
@@ -200,39 +200,39 @@ class VerbParseNode(BaseParseNode):
 
 
 class AtomParseNode(BaseParseNode):
-    type: str  # "atom"
+
     family: Atom
     text: str
 
 
 class MathordParseNode(BaseParseNode):
-    type: str  # "mathord"
+
     text: str
 
 
 class SpacingParseNode(BaseParseNode):
-    type: str  # "spacing"
+
     text: str
 
 
 class TextordParseNode(BaseParseNode):
-    type: str  # "textord"
+
     text: str
 
 
 class AccentTokenParseNode(BaseParseNode):
-    type: str  # "accent-token"
+
     text: str
 
 
 class OpTokenParseNode(BaseParseNode):
-    type: str  # "op-token"
+
     text: str
 
 
 # Function/command nodes
 class AccentParseNode(BaseParseNode):
-    type: str  # "accent"
+
     label: str
     isStretchy: Optional[bool]
     isShifty: Optional[bool]
@@ -240,7 +240,7 @@ class AccentParseNode(BaseParseNode):
 
 
 class AccentUnderParseNode(BaseParseNode):
-    type: str  # "accentUnder"
+
     label: str
     isStretchy: Optional[bool]
     isShifty: Optional[bool]
@@ -248,20 +248,20 @@ class AccentUnderParseNode(BaseParseNode):
 
 
 class CrParseNode(BaseParseNode):
-    type: str  # "cr"
+
     newLine: bool
     size: Optional[Measurement]
 
 
 class DelimsizingParseNode(BaseParseNode):
-    type: str  # "delimsizing"
+
     size: int  # 1, 2, 3, or 4
     mclass: str  # "mopen" | "mclose" | "mrel" | "mord"
     delim: str
 
 
 class EncloseParseNode(BaseParseNode):
-    type: str  # "enclose"
+
     label: str
     backgroundColor: Optional[str]
     borderColor: Optional[str]
@@ -269,19 +269,19 @@ class EncloseParseNode(BaseParseNode):
 
 
 class EnvironmentParseNode(BaseParseNode):
-    type: str  # "environment"
+
     name: str
     nameGroup: AnyParseNode
 
 
 class FontParseNode(BaseParseNode):
-    type: str  # "font"
+
     font: str
     body: List[AnyParseNode]
 
 
 class GenfracParseNode(BaseParseNode):
-    type: str  # "genfrac"
+
     continued: bool
     numer: AnyParseNode
     denom: AnyParseNode
@@ -293,37 +293,37 @@ class GenfracParseNode(BaseParseNode):
 
 
 class HboxParseNode(BaseParseNode):
-    type: str  # "hbox"
+
     body: List[AnyParseNode]
 
 
 class HorizBraceParseNode(BaseParseNode):
-    type: str  # "horizBrace"
+
     label: str
     isOver: bool
     base: AnyParseNode
 
 
 class HrefParseNode(BaseParseNode):
-    type: str  # "href"
+
     href: str
     body: List[AnyParseNode]
 
 
 class HtmlParseNode(BaseParseNode):
-    type: str  # "html"
+
     attributes: Dict[str, str]
     body: List[AnyParseNode]
 
 
 class HtmlmathmlParseNode(BaseParseNode):
-    type: str  # "htmlmathml"
+
     html: List[AnyParseNode]
     mathml: List[AnyParseNode]
 
 
 class IncludegraphicsParseNode(BaseParseNode):
-    type: str  # "includegraphics"
+
     alt: str
     width: Measurement
     height: Measurement
@@ -332,29 +332,30 @@ class IncludegraphicsParseNode(BaseParseNode):
 
 
 class InfixParseNode(BaseParseNode):
-    type: str  # "infix"
+
     replaceWith: str
     size: Optional[Measurement]
     token: Optional[Token]
 
 
 class InternalParseNode(BaseParseNode):
-    type: str  # "internal"
+    pass
+
 
 
 class KernParseNode(BaseParseNode):
-    type: str  # "kern"
+
     dimension: Measurement
 
 
 class LapParseNode(BaseParseNode):
-    type: str  # "lap"
+
     alignment: str
     body: AnyParseNode
 
 
 class LeftrightParseNode(BaseParseNode):
-    type: str  # "leftright"
+
     body: List[AnyParseNode]
     left: str
     right: str
@@ -362,13 +363,13 @@ class LeftrightParseNode(BaseParseNode):
 
 
 class LeftrightRightParseNode(BaseParseNode):
-    type: str  # "leftright-right"
+
     delim: str
     color: Optional[str]
 
 
 class MathchoiceParseNode(BaseParseNode):
-    type: str  # "mathchoice"
+
     display: List[AnyParseNode]
     text: List[AnyParseNode]
     script: List[AnyParseNode]
@@ -376,19 +377,19 @@ class MathchoiceParseNode(BaseParseNode):
 
 
 class MiddleParseNode(BaseParseNode):
-    type: str  # "middle"
+
     delim: str
 
 
 class MclassParseNode(BaseParseNode):
-    type: str  # "mclass"
+
     mclass: str
     body: List[AnyParseNode]
     isCharacterBox: bool
 
 
 class OperatornameParseNode(BaseParseNode):
-    type: str  # "operatorname"
+
     body: List[AnyParseNode]
     alwaysHandleSupSub: bool
     limits: bool
@@ -396,75 +397,75 @@ class OperatornameParseNode(BaseParseNode):
 
 
 class OverlineParseNode(BaseParseNode):
-    type: str  # "overline"
+
     body: AnyParseNode
 
 
 class PhantomParseNode(BaseParseNode):
-    type: str  # "phantom"
+
     body: List[AnyParseNode]
 
 
 class HphantomParseNode(BaseParseNode):
-    type: str  # "hphantom"
+
     body: AnyParseNode
 
 
 class VphantomParseNode(BaseParseNode):
-    type: str  # "vphantom"
+
     body: AnyParseNode
 
 
 class PmbParseNode(BaseParseNode):
-    type: str  # "pmb"
+
     mclass: str
     body: List[AnyParseNode]
 
 
 class RaiseboxParseNode(BaseParseNode):
-    type: str  # "raisebox"
+
     dy: Measurement
     body: AnyParseNode
 
 
 class RuleParseNode(BaseParseNode):
-    type: str  # "rule"
+
     shift: Optional[Measurement]
     width: Measurement
     height: Measurement
 
 
 class SizingParseNode(BaseParseNode):
-    type: str  # "sizing"
+
     size: int
     body: List[AnyParseNode]
 
 
 class SmashParseNode(BaseParseNode):
-    type: str  # "smash"
+
     body: AnyParseNode
     smashHeight: bool
     smashDepth: bool
 
 
 class SqrtParseNode(BaseParseNode):
-    type: str  # "sqrt"
+
     body: AnyParseNode
     index: Optional[AnyParseNode]
 
 
 class UnderlineParseNode(BaseParseNode):
-    type: str  # "underline"
+
     body: AnyParseNode
 
 
 class VcenterParseNode(BaseParseNode):
-    type: str  # "vcenter"
+
     body: AnyParseNode
 
 
 class XArrowParseNode(BaseParseNode):
-    type: str  # "xArrow"
+
     label: str
     body: AnyParseNode
     below: Optional[AnyParseNode]

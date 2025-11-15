@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..define_function import define_function
 from ..parse_error import ParseError
@@ -11,10 +11,10 @@ from ..units import calculate_size, valid_unit, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import IncludegraphicsParseNode, ParseNode
+    from ..parse_node import IncludegraphicsParseNode, ParseNode, RawParseNode, UrlParseNode
 
 
-def size_data(size_str: str):
+def size_data(size_str: str) -> Dict[str, Any]:
     """Parse size specification for includegraphics."""
     import re
 
@@ -31,7 +31,7 @@ def size_data(size_str: str):
     unit = match.group(3)
 
     data = {"number": number, "unit": unit}
-    if not valid_unit(data):
+    if not valid_unit(unit):
         raise ParseError(f"Invalid unit: '{unit}' in \\includegraphics.")
 
     return data
@@ -53,7 +53,7 @@ define_function({
 })
 
 
-def _includegraphics_handler(context, args, opt_args) -> ParseNode:
+def _includegraphics_handler(context: Dict[str, Any], args: List[Any], opt_args: List[Any]) -> Dict[str, Any]:
     """Handler for \includegraphics command."""
     # Default values
     width = {"number": 0, "unit": "em"}
@@ -63,7 +63,7 @@ def _includegraphics_handler(context, args, opt_args) -> ParseNode:
 
     # Parse optional arguments
     if opt_args and opt_args[0]:
-        attribute_str = assert_node_type(opt_args[0], "raw")["string"]
+        attribute_str = cast("RawParseNode", assert_node_type(opt_args[0], "raw"))["string"]
         attributes = attribute_str.split(",")
 
         for attr in attributes:
@@ -84,7 +84,7 @@ def _includegraphics_handler(context, args, opt_args) -> ParseNode:
                     raise ParseError(f"Invalid key: '{key}' in \\includegraphics.")
 
     # Get source URL
-    src = assert_node_type(args[0], "url")["url"]
+    src = cast("UrlParseNode", assert_node_type(args[0], "url"))["url"]
 
     # Set default alt text if not provided
     if not alt:
@@ -97,7 +97,7 @@ def _includegraphics_handler(context, args, opt_args) -> ParseNode:
         "command": "\\includegraphics",
         "url": src,
     }):
-        return context["parser"].format_unsupported_cmd("\\includegraphics")
+        return cast(Dict[str, Any], context["parser"].format_unsupported_cmd("\\includegraphics"))
 
     return {
         "type": "includegraphics",
@@ -114,12 +114,12 @@ def _includegraphics_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for includegraphics."""
     ig_group = cast("IncludegraphicsParseNode", group)
     height = calculate_size(ig_group["height"], options)
-    depth = 0
+    depth = 0.0
 
     if ig_group["totalheight"]["number"] > 0:
         depth = calculate_size(ig_group["totalheight"], options) - height
 
-    width = 0
+    width = 0.0
     if ig_group["width"]["number"] > 0:
         width = calculate_size(ig_group["width"], options)
 
@@ -131,7 +131,7 @@ def _includegraphics_html_builder(group: ParseNode, options: "Options") -> Any:
 
     # Create image node
     from ..dom_tree import Img
-    node = Img(ig_group["src"], ig_group["alt"], style)
+    node = Img(src=ig_group["src"], alt=ig_group["alt"], style=style)
     node.height = height
     node.depth = depth
 
@@ -148,7 +148,7 @@ def _includegraphics_mathml_builder(group: ParseNode, options: "Options") -> Any
     node.set_attribute("src", ig_group["src"])
 
     height = calculate_size(ig_group["height"], options)
-    depth = 0
+    depth = 0.0
 
     if ig_group["totalheight"]["number"] > 0:
         depth = calculate_size(ig_group["totalheight"], options) - height

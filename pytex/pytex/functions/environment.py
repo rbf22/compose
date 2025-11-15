@@ -10,7 +10,6 @@ from ..parse_error import ParseError
 from ..parse_node import AnyParseNode, assert_node_type
 
 if TYPE_CHECKING:
-    from ..parse_node import ParseNode
     from ..parser import Parser
 
 

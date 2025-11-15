@@ -146,7 +146,7 @@ class Parser:
         return self.handle_infix_nodes(body)
 
     def handle_infix_nodes(self, body: List[Any]) -> List[Any]:
-        """Rewrites infix operators like \over with commands like \frac."""
+        r"""Rewrites infix operators like \over with commands like \frac."""
         over_index = -1
         func_name = None
 

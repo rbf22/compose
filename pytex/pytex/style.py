@@ -6,11 +6,17 @@ from dataclasses import dataclass
 from typing import Dict
 
 
-@dataclass(frozen=True)
+@dataclass
 class Style:
     id: int
     size: int
     cramped: bool
+
+    # Class constants for style types
+    DISPLAY = None  # type: Style
+    TEXT = None  # type: Style
+    SCRIPT = None  # type: Style
+    SCRIPTSCRIPT = None  # type: Style
 
     def sup(self) -> "Style":
         return STYLES[_SUP[self.id]]
@@ -48,8 +54,9 @@ STYLES = (
 )
 
 # Provide KaTeX-style constants for convenient access
+# Note: These are set after STYLES is defined
 Style.DISPLAY = STYLES[D]
-Style.TEXT = STYLES[T]
+Style.TEXT = STYLES[T] 
 Style.SCRIPT = STYLES[S]
 Style.SCRIPTSCRIPT = STYLES[SS]
 

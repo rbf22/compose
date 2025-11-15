@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, cast
+from typing import TYPE_CHECKING, Any, Dict, cast, List
 
 from ..define_function import define_function
 from ..mathml_tree import MathNode
@@ -10,13 +10,14 @@ from ..style import Style
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode, StylingParseNode
+    from ..parse_node import ParseNode, StylingParseNode, AnyParseNode
+    from ..dom_tree import DomNode
 
 # Import sizingGroup from sizing
 try:
     from .sizing import sizing_group
 except ImportError:
-    def sizing_group(value, options, base_options):
+    def sizing_group(value: List[AnyParseNode], options: "Options", base_options: "Options") -> "DomNode":
         """Fallback sizing group function."""
         return value
 

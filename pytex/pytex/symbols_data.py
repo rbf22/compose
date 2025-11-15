@@ -2322,3 +2322,21 @@ ligatures = {
   "``": True,
   "''": True
 }
+
+
+ATOMS = {
+    "bin": 1,
+    "close": 1,
+    "inner": 1,
+    "open": 1,
+    "punct": 1,
+    "rel": 1,
+}
+
+NON_ATOMS = {
+    "accent-token": 1,
+    "mathord": 1,
+    "op-token": 1,
+    "spacing": 1,
+    "textord": 1,
+}

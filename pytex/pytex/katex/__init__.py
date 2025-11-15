@@ -7,7 +7,7 @@ the fastest math rendering library for the web.
 from __future__ import annotations
 
 import warnings
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union, Dict, Any, Callable
 
 from ..define_macro import defineMacro
 from ..define_function import defineFunction
@@ -18,7 +18,7 @@ __email__ = "robert_fenwick@epam.com"
 __license__ = "MIT"
 
 
-def render_to_string(math: str, options: Optional[Dict[str, Any]] = None) -> str:
+def render_to_string(math: Optional[str], options: Optional[Dict[str, Any]] = None) -> str:
     """Render LaTeX math expression to HTML string.
 
     Args:
@@ -33,6 +33,9 @@ def render_to_string(math: str, options: Optional[Dict[str, Any]] = None) -> str
     """
     if options is None:
         options = {}
+    
+    if math is None:
+        math = ""
 
     # For now, return a simple placeholder implementation
     # The full implementation requires the complete functions/symbols database
@@ -71,8 +74,8 @@ def render(math: str, element_id: Optional[str] = None, options: Optional[Dict[s
         print(f"Would render to element '{element_id}': {result}")
 
 
-def define_macro(name: str, expansion: Union[str, callable]) -> None:
-    """Define a custom LaTeX macro.
+def define_macro(name: str, expansion: Union[str, Callable]) -> None:
+    r"""Define a custom LaTeX macro.
 
     Args:
         name: Macro name (with backslash, e.g., r"\RR")

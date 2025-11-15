@@ -2,18 +2,26 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Union, cast
 
 from ..build_common import make_line_span, make_span, make_v_list
 from ..define_function import define_function, normalize_argument
 from ..mathml_tree import MathNode
 from ..parse_error import ParseError
 from ..style import Style
-from ..units import calculate_size, make_em
+from ..types import Mode
+from ..units import Measurement, calculate_size, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import GenfracParseNode, ParseNode
+    from ..parse_node import (
+        GenfracParseNode,
+        ParseNode,
+        AtomParseNode,
+        SizeParseNode,
+        TextordParseNode,
+        InfixParseNode,
+    )
 
 
 def adjust_style(size: str, original_style: Style) -> Style:
@@ -61,23 +69,24 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
 
     # Handle fraction bar
     rule = None
-    rule_width = 0
-    rule_spacing = options.font_metrics().get("defaultRuleThickness", 0.04)
+    rule_width: float = 0.0
+    rule_spacing: float = options.font_metrics().get("defaultRuleThickness", 0.04)
 
     if genfrac_group.get("hasBarLine"):
-        if genfrac_group.get("barSize"):
-            rule_width = calculate_size(genfrac_group["barSize"], options)
+        bar_size_value = genfrac_group.get("barSize")
+        if bar_size_value:
+            rule_width = calculate_size(cast(Measurement, bar_size_value), options)
             rule = make_line_span("frac-line", options, rule_width)
         else:
             rule = make_line_span("frac-line", options)
-        rule_width = rule.height
+        rule_width = float(rule.height)
         rule_spacing = rule.height
 
     # Rule 15b - calculate shifts
     if style.size == Style.DISPLAY.size or genfrac_group.get("size") == "display":
-        num_shift = options.font_metrics().get("num1", 0)
-        clearance = 3 * rule_spacing if rule_width > 0 else 7 * rule_spacing
-        denom_shift = options.font_metrics().get("denom1", 0)
+        num_shift: float = options.font_metrics().get("num1", 0)
+        clearance: float = 3 * rule_spacing if rule_width > 0 else 7 * rule_spacing
+        denom_shift: float = options.font_metrics().get("denom1", 0)
     else:
         if rule_width > 0:
             num_shift = options.font_metrics().get("num2", 0)
@@ -142,24 +151,27 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         delim_size = options.font_metrics().get("delim2", 0)
 
     # Left delimiter
-    if genfrac_group.get("leftDelim") is None:
+    left_delim_symbol = genfrac_group.get("leftDelim")
+    if left_delim_symbol is None:
         left_delim = html.make_null_delimiter(options, ["mopen"])
     else:
         left_delim = delimiter.make_custom_sized_delim(
-            genfrac_group["leftDelim"], delim_size, True,
-            options.having_style(style), genfrac_group.get("mode", "math"), ["mopen"]
+            left_delim_symbol, delim_size, True,
+            options.having_style(style), genfrac_group.get("mode", Mode.MATH), ["mopen"]
         )
 
     # Right delimiter
     if genfrac_group.get("continued"):
         right_delim = make_span([])  # zero width for \cfrac
-    elif genfrac_group.get("rightDelim") is None:
-        right_delim = html.make_null_delimiter(options, ["mclose"])
     else:
-        right_delim = delimiter.make_custom_sized_delim(
-            genfrac_group["rightDelim"], delim_size, True,
-            options.having_style(style), genfrac_group.get("mode", "math"), ["mclose"]
-        )
+        right_delim_symbol = genfrac_group.get("rightDelim")
+        if right_delim_symbol is None:
+            right_delim = html.make_null_delimiter(options, ["mclose"])
+        else:
+            right_delim = delimiter.make_custom_sized_delim(
+                right_delim_symbol, delim_size, True,
+                options.having_style(style), genfrac_group.get("mode", Mode.MATH), ["mclose"]
+            )
 
     return make_span(
         ["mord"] + new_options.sizing_classes(options),
@@ -180,8 +192,12 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     if not genfrac_group.get("hasBarLine", True):
         node.set_attribute("linethickness", "0px")
-    elif genfrac_group.get("barSize"):
-        rule_width = calculate_size(genfrac_group["barSize"], options)
+    else:
+        bar_size_value = genfrac_group.get("barSize")
+        if bar_size_value:
+            rule_width = calculate_size(cast(Measurement, bar_size_value), options)
+        else:
+            rule_width = options.font_metrics().get("defaultRuleThickness", 0.04)
         node.set_attribute("linethickness", make_em(rule_width))
 
     style = adjust_style(genfrac_group.get("size", "auto"), options.style)
@@ -195,16 +211,18 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
         with_delims = []
 
         if genfrac_group.get("leftDelim") is not None:
-            left_text = genfrac_group["leftDelim"].replace("\\", "")
-            left_op = MathNode("mo", [mml.make_text(left_text, "math", options)])
+            left_delim = genfrac_group["leftDelim"]
+            left_text = left_delim.replace("\\", "") if left_delim is not None else ""
+            left_op = MathNode("mo", [mml.make_text(left_text, Mode.MATH, options)])
             left_op.set_attribute("fence", "true")
             with_delims.append(left_op)
 
         with_delims.append(node)
 
         if genfrac_group.get("rightDelim") is not None:
-            right_text = genfrac_group["rightDelim"].replace("\\", "")
-            right_op = MathNode("mo", [mml.make_text(right_text, "math", options)])
+            right_delim = genfrac_group["rightDelim"]
+            right_text = right_delim.replace("\\", "") if right_delim is not None else ""
+            right_op = MathNode("mo", [mml.make_text(right_text, Mode.MATH, options)])
             right_op.set_attribute("fence", "true")
             with_delims.append(right_op)
 
@@ -239,7 +257,7 @@ define_function({
     "mathml_builder": mathml_builder,
 })
 
-def _genfrac_handler(context, args, continued):
+def _genfrac_handler(context: Dict[str, Any], args: List[Any], continued: bool) -> Dict[str, Any]:
     """Handler for basic fraction commands."""
     parser = context["parser"]
     func_name = context["funcName"]
@@ -289,7 +307,7 @@ def _genfrac_handler(context, args, continued):
     }
 
 
-def _infix_genfrac_handler(context):
+def _infix_genfrac_handler(context: Dict[str, Any]) -> Dict[str, Any]:
     """Handler for infix fraction commands."""
     func_name = context["funcName"]
     token = context["token"]
@@ -313,8 +331,8 @@ def _infix_genfrac_handler(context):
     }
 
 
-def _genfrac_full_handler(context, args):
-    """Handler for \genfrac command."""
+def _genfrac_full_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
+    r"""Handler for \genfrac command."""
     from ..parse_node import assert_node_type
 
     parser = context["parser"]
@@ -323,23 +341,23 @@ def _genfrac_full_handler(context, args):
 
     # Parse delimiters
     left_node = normalize_argument(args[0])
-    left_delim = (delim_from_value(left_node["text"])
+    left_delim = (delim_from_value(cast("AtomParseNode", left_node)["text"])
                   if left_node.get("type") == "atom" and left_node.get("family") == "open"
                   else None)
 
     right_node = normalize_argument(args[1])
-    right_delim = (delim_from_value(right_node["text"])
+    right_delim = (delim_from_value(cast("AtomParseNode", right_node)["text"])
                    if right_node.get("type") == "atom" and right_node.get("family") == "close"
                    else None)
 
     # Parse bar size
-    bar_node = assert_node_type(args[2], "size")
+    bar_node = cast("SizeParseNode", assert_node_type(args[2], "size"))
     if bar_node.get("isBlank"):
         has_bar_line = True
         bar_size = None
     else:
         bar_size = bar_node.get("value")
-        has_bar_line = bar_size and bar_size.get("number", 0) > 0
+        has_bar_line = bool(bar_size and bar_size.get("number", 0) > 0)
 
     # Parse style
     styl_array = ["display", "text", "script", "scriptscript"]
@@ -347,11 +365,11 @@ def _genfrac_full_handler(context, args):
     styl = args[3]
 
     if styl.get("type") == "ordgroup" and styl.get("body"):
-        text_ord = assert_node_type(styl["body"][0], "textord")
+        text_ord = cast("TextordParseNode", assert_node_type(styl["body"][0], "textord"))
         size_index = int(text_ord["text"])
         size = styl_array[size_index] if 0 <= size_index < len(styl_array) else "auto"
     else:
-        styl = assert_node_type(styl, "textord")
+        styl = cast("TextordParseNode", assert_node_type(styl, "textord"))
         size_index = int(styl["text"])
         size = styl_array[size_index] if 0 <= size_index < len(styl_array) else "auto"
 
@@ -369,7 +387,7 @@ def _genfrac_full_handler(context, args):
     }
 
 
-def _above_handler(context, args):
+def _above_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
     """Handler for \above command."""
     from ..parse_node import assert_node_type
 
@@ -377,20 +395,20 @@ def _above_handler(context, args):
         "type": "infix",
         "mode": context["parser"].mode,
         "replaceWith": "\\\\abovefrac",
-        "size": assert_node_type(args[0], "size")["value"],
+        "size": cast("SizeParseNode", assert_node_type(args[0], "size"))["value"],
         "token": context["token"],
     }
 
 
-def _abovefrac_handler(context, args):
-    """Handler for \\abovefrac command."""
+def _abovefrac_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
+    r"""Handler for \abovefrac command."""
     from ..parse_node import assert_node_type
 
     numer = args[0]
-    bar_size = assert_node_type(args[1], "infix")["size"]
+    bar_size = cast("InfixParseNode", assert_node_type(args[1], "infix"))["size"]
     denom = args[2]
 
-    has_bar_line = bar_size and bar_size.get("number", 0) > 0
+    has_bar_line = bool(bar_size and bar_size.get("number", 0) > 0)
 
     return {
         "type": "genfrac",

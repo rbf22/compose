@@ -261,7 +261,7 @@ def enclose_span(
     bottom_pad: float,
     options: Options,
 ) -> Union[DomSpan, SvgSpan]:
-    """Create enclosed span for elements like \cancel, \fbox, etc."""
+    r"""Create enclosed span for elements like \cancel, \fbox, etc."""
     total_height = inner.height + inner.depth + top_pad + bottom_pad
 
     if "fbox" in label or "color" in label or "angl" in label:

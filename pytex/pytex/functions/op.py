@@ -141,8 +141,9 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     op_group = cast("OpParseNode", group)
     if op_group.get("symbol"):
         mode = _as_mode(op_group.get("mode", Mode.MATH))
-        node = MathNode("mo", [mml.make_text(op_group.get("name", ""), mode)])
-        if op_group.get("name") in NO_SUCCESSOR:
+        name = op_group.get("name", "")
+        node = MathNode("mo", [mml.make_text(name, mode)])
+        if name in NO_SUCCESSOR:
             node.set_attribute("largeop", "false")
         return node
 

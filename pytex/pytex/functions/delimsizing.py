@@ -56,7 +56,7 @@ DELIMITERS = [
 ]
 
 
-def check_delimiter(delim: AnyParseNode, context: FunctionContext) -> SymbolParseNode:
+def check_delimiter(delim: AnyParseNode, context: Dict[str, Any]) -> SymbolParseNode:
     """Validate and return delimiter symbol."""
     sym_delim = check_symbol_node_type(delim)
     if sym_delim and sym_delim["text"] in DELIMITERS:
@@ -132,7 +132,7 @@ define_function({
 })
 
 
-def _delimsizing_handler(context, args):
+def _delimsizing_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str, Any]:
     """Handler for delimiter sizing commands."""
     delim = check_delimiter(args[0], context)
     size_info = DELIMITER_SIZES[context["funcName"]]
@@ -190,8 +190,8 @@ def _delimsizing_mathml_builder(group: ParseNode, options: "Options") -> MathNod
     return node
 
 
-def _right_handler(context, args):
-    """Handler for \right delimiter."""
+def _right_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str, Any]:
+    r"""Handler for \right delimiter."""
     color = context["parser"].gullet.macros.get("\\current@color")
     if color and not isinstance(color, str):
         raise ParseError("\\current@color set to non-string in \\right")
@@ -204,8 +204,8 @@ def _right_handler(context, args):
     }
 
 
-def _left_handler(context, args):
-    """Handler for \left delimiter."""
+def _left_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str, Any]:
+    r"""Handler for \left delimiter."""
     delim = check_delimiter(args[0], context)
     parser = context["parser"]
 
@@ -230,7 +230,7 @@ def _left_handler(context, args):
 
 
 def _leftright_html_builder(group: ParseNode, options: "Options") -> Any:
-    """Build HTML for \left...\right delimiters."""
+    r"""Build HTML for \left...\right delimiters."""
     from .. import build_html as html
 
     leftright_group = cast("LeftrightParseNode", group)
@@ -294,7 +294,7 @@ def _leftright_html_builder(group: ParseNode, options: "Options") -> Any:
 
 
 def _leftright_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
-    """Build MathML for \left...\right delimiters."""
+    r"""Build MathML for \left...\right delimiters."""
     from .. import build_mathml as mml
 
     leftright_group = cast("LeftrightParseNode", group)
@@ -318,8 +318,8 @@ def _leftright_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     return mml.make_row(inner)
 
 
-def _middle_handler(context, args):
-    """Handler for \middle delimiter."""
+def _middle_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str, Any]:
+    r"""Handler for \middle delimiter."""
     delim = check_delimiter(args[0], context)
 
     if not context["parser"].leftright_depth:
@@ -333,7 +333,7 @@ def _middle_handler(context, args):
 
 
 def _middle_html_builder(group: ParseNode, options: "Options") -> Any:
-    """Build HTML for \middle delimiters."""
+    r"""Build HTML for \middle delimiters."""
     from .. import build_html as html
     from .. import delimiter
 
@@ -355,7 +355,7 @@ def _middle_html_builder(group: ParseNode, options: "Options") -> Any:
 
 
 def _middle_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
-    """Build MathML for \middle delimiters."""
+    r"""Build MathML for \middle delimiters."""
     from .. import build_mathml as mml
 
     middle_group = cast("MiddleParseNode", group)

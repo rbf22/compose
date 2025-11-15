@@ -8,6 +8,7 @@ from .build_common import make_span
 from .font_metrics import get_character_metrics
 from .mathml_tree import MathNode, TextNode
 from .parse_error import ParseError
+from .types import FontVariant
 
 # Placeholder imports
 try:
@@ -24,9 +25,8 @@ except ImportError:
 if TYPE_CHECKING:
     from .options import Options
     from .parse_node import AnyParseNode, SymbolParseNode
-    from .types import FontVariant, Mode
-    from .dom_tree import DomSpan
-
+    from .types import Mode
+    from .dom_tree import DomSpan, DomNode
 
 def make_text(text: str, mode: Mode, options: Optional[Options] = None) -> TextNode:
     """Create a MathML text node with optional symbol replacement."""
@@ -54,22 +54,22 @@ def get_variant(group: SymbolParseNode, options: Options) -> Optional[FontVarian
     """Get the math variant for a symbol group."""
     # Handle font family variants
     if options.font_family == "texttt":
-        return "monospace"
+        return FontVariant.MONOSPACE
     elif options.font_family == "textsf":
         if options.font_shape == "textit" and options.font_weight == "textbf":
-            return "sans-serif-bold-italic"
+            return FontVariant.SANS_SERIF_BOLD_ITALIC
         elif options.font_shape == "textit":
-            return "sans-serif-italic"
+            return FontVariant.SANS_SERIF_ITALIC
         elif options.font_weight == "textbf":
-            return "bold-sans-serif"
+            return FontVariant.BOLD_SANS_SERIF
         else:
-            return "sans-serif"
+            return FontVariant.SANS_SERIF
     elif options.font_shape == "textit" and options.font_weight == "textbf":
-        return "bold-italic"
+        return FontVariant.BOLD_ITALIC
     elif options.font_shape == "textit":
-        return "italic"
+        return FontVariant.ITALIC
     elif options.font_weight == "textbf":
-        return "bold"
+        return FontVariant.BOLD
 
     font = options.font
     if not font or font == "mathnormal":
@@ -77,23 +77,23 @@ def get_variant(group: SymbolParseNode, options: Options) -> Optional[FontVarian
 
     mode = group["mode"]
     if font == "mathit":
-        return "italic"
+        return FontVariant.ITALIC
     elif font == "boldsymbol":
-        return "bold" if group["type"] == "textord" else "bold-italic"
+        return FontVariant.BOLD if group["type"] == "textord" else FontVariant.BOLD_ITALIC
     elif font == "mathbf":
-        return "bold"
+        return FontVariant.BOLD
     elif font == "mathbb":
-        return "double-struck"
+        return FontVariant.DOUBLE_STRUCK
     elif font == "mathsfit":
-        return "sans-serif-italic"
+        return FontVariant.SANS_SERIF_ITALIC
     elif font == "mathfrak":
-        return "fraktur"
+        return FontVariant.FRAKTUR
     elif font in ("mathscr", "mathcal"):
-        return "script"
+        return FontVariant.SCRIPT
     elif font == "mathsf":
-        return "sans-serif"
+        return FontVariant.SANS_SERIF
     elif font == "mathtt":
-        return "monospace"
+        return FontVariant.MONOSPACE
 
     text = group["text"]
     if text in ["\\imath", "\\jmath"]:
@@ -207,7 +207,7 @@ def build_group(group: Optional[AnyParseNode], options: Options) -> MathNode:
     if group["type"] in group_builders:
         # Call the group builder function
         result = group_builders[group["type"]](group, options)
-        return result
+        return cast(MathNode, result)  # type: ignore[return-value]
     else:
         raise ParseError(f"Got group of unknown type: '{group['type']}'")
 
@@ -244,7 +244,7 @@ def build_mathml(
 
     # Wrap in span for styling
     wrapper_class = "katex" if for_mathml_only else "katex-mathml"
-    return make_span([wrapper_class], [math])
+    return make_span([wrapper_class], [cast("DomNode", math)])
 
 
 __all__ = [
