@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..build_common import make_anchor
 from ..define_function import define_function, ordargument
@@ -11,7 +11,7 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import HrefParseNode, ParseNode
 
 
 # \href command
@@ -43,7 +43,7 @@ define_function({
 })
 
 
-def _href_handler(context, args, is_url_command):
+def _href_handler(context: Dict[str, Any], args: List[Any], is_url_command: bool) -> Dict[str, Any]:
     """Handler for href and url commands."""
     parser = context["parser"]
 
@@ -87,21 +87,23 @@ def _href_handler(context, args, is_url_command):
     }
 
 
-def _href_html_builder(group: ParseNode, options: Options):
+def _href_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for hyperlinks."""
     from .. import build_html as html
 
-    elements = html.build_expression(group["body"], options, False)
-    return make_anchor(group["href"], [], elements, options)
+    href_group = cast("HrefParseNode", group)
+    elements = html.build_expression(href_group["body"], options, False)
+    return make_anchor(href_group["href"], [], elements, options)
 
 
-def _href_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _href_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for hyperlinks."""
     from .. import build_mathml as mml
 
-    math = mml.build_expression_row(group["body"], options)
+    href_group = cast("HrefParseNode", group)
+    math = mml.build_expression_row(href_group["body"], options)
     if not isinstance(math, MathNode):
         math = MathNode("mrow", [math])
 
-    math.set_attribute("href", group["href"])
+    math.set_attribute("href", href_group["href"])
     return math

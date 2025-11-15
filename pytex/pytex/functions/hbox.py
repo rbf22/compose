@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_fragment
 from ..define_function import define_function, ordargument
@@ -10,7 +10,7 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import HboxParseNode, ParseNode
 
 
 # \hbox - horizontal box (prevents soft line breaks)
@@ -37,16 +37,18 @@ define_function({
 })
 
 
-def _hbox_html_builder(group: ParseNode, options: Options):
+def _hbox_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for hbox."""
     from .. import build_html as html
 
-    elements = html.build_expression(group["body"], options, False)
+    hbox_group = cast("HboxParseNode", group)
+    elements = html.build_expression(hbox_group["body"], options, False)
     return make_fragment(elements)
 
 
-def _hbox_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _hbox_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for hbox."""
     from .. import build_mathml as mml
 
-    return MathNode("mrow", mml.build_expression(group["body"], options))
+    hbox_group = cast("HboxParseNode", group)
+    return MathNode("mrow", mml.build_expression(hbox_group["body"], options))

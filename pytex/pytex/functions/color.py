@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..build_common import make_fragment
 from ..define_function import define_function, ordargument
@@ -11,17 +11,18 @@ from ..parse_node import assert_node_type
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ColorParseNode, ParseNode
 
 
-def html_builder(group: ParseNode, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for color group."""
     from .. import build_html as html
 
+    color_group = cast("ColorParseNode", group)
     # Build expression with color applied
     elements = html.build_expression(
-        group["body"],
-        options.with_color(group["color"]),
+        color_group["body"],
+        options.with_color(color_group["color"]),
         False
     )
 
@@ -29,16 +30,17 @@ def html_builder(group: ParseNode, options: Options):
     return make_fragment(elements)
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for color group."""
     from .. import build_mathml as mml
 
+    color_group = cast("ColorParseNode", group)
     # Build expression with color applied
-    inner = mml.build_expression(group["body"], options.with_color(group["color"]))
+    inner = mml.build_expression(color_group["body"], options.with_color(color_group["color"]))
 
     # Wrap in mstyle with mathcolor attribute
     node = MathNode("mstyle", inner)
-    node.set_attribute("mathcolor", group["color"])
+    node.set_attribute("mathcolor", color_group["color"])
 
     return node
 
@@ -77,7 +79,7 @@ define_function({
 })
 
 
-def _color_handler(context, args):
+def _color_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
     """Handler for \color command."""
     color = assert_node_type(args[0], "color-token")["color"]
 

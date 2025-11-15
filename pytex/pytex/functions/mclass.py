@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span
 from ..define_function import define_function, ordargument
@@ -11,50 +11,52 @@ from ..utils import is_character_box
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import AnyParseNode, ParseNode
+    from ..parse_node import AnyParseNode, MclassParseNode, ParseNode
 
 
-def html_builder(group: ParseNode, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for math class groups."""
     from .. import build_html as html
 
-    elements = html.build_expression(group["body"], options, True)
-    return make_span([group["mclass"]], elements, options)
+    mclass_group = cast("MclassParseNode", group)
+    elements = html.build_expression(mclass_group["body"], options, True)
+    return make_span([mclass_group["mclass"]], elements, options)
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for math class groups."""
     from .. import build_mathml as mml
 
-    inner = mml.build_expression(group["body"], options)
+    mclass_group = cast("MclassParseNode", group)
+    inner = mml.build_expression(mclass_group["body"], options)
 
-    if group["mclass"] == "minner":
+    if mclass_group["mclass"] == "minner":
         node = MathNode("mpadded", inner)
-    elif group["mclass"] == "mord":
-        if group.get("isCharacterBox"):
+    elif mclass_group["mclass"] == "mord":
+        if mclass_group.get("isCharacterBox"):
             node = inner[0]
             node.type = "mi"
         else:
             node = MathNode("mi", inner)
     else:
         # mbin, mrel, mopen, mclose, mpunct
-        if group.get("isCharacterBox"):
+        if mclass_group.get("isCharacterBox"):
             node = inner[0]
             node.type = "mo"
         else:
             node = MathNode("mo", inner)
 
         # Set spacing attributes based on math class
-        if group["mclass"] == "mbin":
+        if mclass_group["mclass"] == "mbin":
             node.set_attribute("lspace", "0.22em")  # medium space
             node.set_attribute("rspace", "0.22em")
-        elif group["mclass"] == "mpunct":
+        elif mclass_group["mclass"] == "mpunct":
             node.set_attribute("lspace", "0em")
             node.set_attribute("rspace", "0.17em")  # thinspace
-        elif group["mclass"] in ("mopen", "mclose"):
+        elif mclass_group["mclass"] in ("mopen", "mclose"):
             node.set_attribute("lspace", "0em")
             node.set_attribute("rspace", "0em")
-        elif group["mclass"] == "minner":
+        elif mclass_group["mclass"] == "minner":
             node.set_attribute("lspace", "0.0556em")  # 1 mu
             node.set_attribute("width", "+0.1111em")
 

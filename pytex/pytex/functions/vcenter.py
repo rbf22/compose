@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_v_list
 from ..define_function import define_function
@@ -10,7 +10,7 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, VcenterParseNode
 
 
 # \vcenter - vertically center argument on math axis
@@ -32,11 +32,12 @@ define_function({
 })
 
 
-def _vcenter_html_builder(group: ParseNode, options: Options):
+def _vcenter_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for \vcenter command."""
     from .. import build_html as html
 
-    body = html.build_group(group["body"], options)
+    vcenter_group = cast("VcenterParseNode", group)
+    body = html.build_group(vcenter_group["body"], options)
     axis_height = options.font_metrics().get("axisHeight", 0.25)
 
     # Calculate vertical shift to center on math axis
@@ -49,12 +50,13 @@ def _vcenter_html_builder(group: ParseNode, options: Options):
     }, options)
 
 
-def _vcenter_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _vcenter_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for \vcenter command."""
     from .. import build_mathml as mml
 
+    vcenter_group = cast("VcenterParseNode", group)
     # MathML doesn't have direct vertical centering
     # Add a class as breadcrumb for post-processors
     return MathNode(
-        "mpadded", [mml.build_group(group["body"], options)], ["vcenter"]
+        "mpadded", [mml.build_group(vcenter_group["body"], options)], ["vcenter"]
     )

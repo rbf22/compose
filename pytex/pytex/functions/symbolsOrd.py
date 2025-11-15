@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_ord
 from ..define_function import define_function_builders
@@ -10,7 +10,8 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import MathordParseNode, ParseNode, TextordParseNode
+
 
 # Default variants for MathML elements
 DEFAULT_VARIANT = {
@@ -34,33 +35,35 @@ define_function_builders({
 })
 
 
-def _mathord_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _mathord_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for mathord symbols."""
     from .. import build_mathml as mml
 
-    node = MathNode("mi", [mml.make_text(group["text"], group["mode"], options)])
+    mathord_group = cast("MathordParseNode", group)
+    node = MathNode("mi", [mml.make_text(mathord_group["text"], mathord_group["mode"], options)])
 
-    variant = mml.get_variant(group, options) or "italic"
+    variant = mml.get_variant(mathord_group, options) or "italic"
     if variant != DEFAULT_VARIANT.get(node.type, ""):
         node.set_attribute("mathvariant", variant)
 
     return node
 
 
-def _textord_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _textord_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for textord symbols."""
     from .. import build_mathml as mml
     import re
 
-    text = mml.make_text(group["text"], group["mode"], options)
-    variant = mml.get_variant(group, options) or "normal"
+    textord_group = cast("TextordParseNode", group)
+    text = mml.make_text(textord_group["text"], textord_group["mode"], options)
+    variant = mml.get_variant(textord_group, options) or "normal"
 
     # Determine appropriate MathML element type
-    if group["mode"] == 'text':
+    if textord_group["mode"] == 'text':
         node = MathNode("mtext", [text])
-    elif re.match(r'[0-9]', group["text"]):
+    elif re.match(r'[0-9]', textord_group["text"]):
         node = MathNode("mn", [text])
-    elif group["text"] == "\\prime":
+    elif textord_group["text"] == "\\prime":
         node = MathNode("mo", [text])
     else:
         node = MathNode("mi", [text])

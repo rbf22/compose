@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union, cast
 
 from ..build_common import make_line_span, make_span, make_v_list
 from ..define_function import define_function, normalize_argument
@@ -13,7 +13,7 @@ from ..units import calculate_size, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import GenfracParseNode, ParseNode
 
 
 def adjust_style(size: str, original_style: Style) -> Style:
@@ -33,21 +33,22 @@ def adjust_style(size: str, original_style: Style) -> Style:
     return style
 
 
-def html_builder(group: ParseNode, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for generalized fraction."""
     from .. import build_html as html
     from .. import delimiter
 
-    style = adjust_style(group.get("size", "auto"), options.style)
+    genfrac_group = cast("GenfracParseNode", group)
+    style = adjust_style(genfrac_group.get("size", "auto"), options.style)
 
     nstyle = style.frac_num()
     dstyle = style.frac_den()
 
     # Build numerator
     new_options = options.having_style(nstyle)
-    numerm = html.build_group(group["numer"], new_options, options)
+    numerm = html.build_group(genfrac_group["numer"], new_options, options)
 
-    if group.get("continued"):
+    if genfrac_group.get("continued"):
         # \cfrac inserts a strut into the numerator
         h_strut = 8.5 / options.font_metrics().get("ptPerEm", 10)
         d_strut = 3.5 / options.font_metrics().get("ptPerEm", 10)
@@ -56,16 +57,16 @@ def html_builder(group: ParseNode, options: Options):
 
     # Build denominator
     new_options = options.having_style(dstyle)
-    denomm = html.build_group(group["denom"], new_options, options)
+    denomm = html.build_group(genfrac_group["denom"], new_options, options)
 
     # Handle fraction bar
     rule = None
     rule_width = 0
     rule_spacing = options.font_metrics().get("defaultRuleThickness", 0.04)
 
-    if group.get("hasBarLine"):
-        if group.get("barSize"):
-            rule_width = calculate_size(group["barSize"], options)
+    if genfrac_group.get("hasBarLine"):
+        if genfrac_group.get("barSize"):
+            rule_width = calculate_size(genfrac_group["barSize"], options)
             rule = make_line_span("frac-line", options, rule_width)
         else:
             rule = make_line_span("frac-line", options)
@@ -73,7 +74,7 @@ def html_builder(group: ParseNode, options: Options):
         rule_spacing = rule.height
 
     # Rule 15b - calculate shifts
-    if style.size == Style.DISPLAY.size or group.get("size") == "display":
+    if style.size == Style.DISPLAY.size or genfrac_group.get("size") == "display":
         num_shift = options.font_metrics().get("num1", 0)
         clearance = 3 * rule_spacing if rule_width > 0 else 7 * rule_spacing
         denom_shift = options.font_metrics().get("denom1", 0)
@@ -141,23 +142,23 @@ def html_builder(group: ParseNode, options: Options):
         delim_size = options.font_metrics().get("delim2", 0)
 
     # Left delimiter
-    if group.get("leftDelim") is None:
+    if genfrac_group.get("leftDelim") is None:
         left_delim = html.make_null_delimiter(options, ["mopen"])
     else:
         left_delim = delimiter.make_custom_sized_delim(
-            group["leftDelim"], delim_size, True,
-            options.having_style(style), group.get("mode", "math"), ["mopen"]
+            genfrac_group["leftDelim"], delim_size, True,
+            options.having_style(style), genfrac_group.get("mode", "math"), ["mopen"]
         )
 
     # Right delimiter
-    if group.get("continued"):
+    if genfrac_group.get("continued"):
         right_delim = make_span([])  # zero width for \cfrac
-    elif group.get("rightDelim") is None:
+    elif genfrac_group.get("rightDelim") is None:
         right_delim = html.make_null_delimiter(options, ["mclose"])
     else:
         right_delim = delimiter.make_custom_sized_delim(
-            group["rightDelim"], delim_size, True,
-            options.having_style(style), group.get("mode", "math"), ["mclose"]
+            genfrac_group["rightDelim"], delim_size, True,
+            options.having_style(style), genfrac_group.get("mode", "math"), ["mclose"]
         )
 
     return make_span(
@@ -167,41 +168,42 @@ def html_builder(group: ParseNode, options: Options):
     )
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for generalized fraction."""
     from .. import build_mathml as mml
 
+    genfrac_group = cast("GenfracParseNode", group)
     node = MathNode("mfrac", [
-        mml.build_group(group["numer"], options),
-        mml.build_group(group["denom"], options),
+        mml.build_group(genfrac_group["numer"], options),
+        mml.build_group(genfrac_group["denom"], options),
     ])
 
-    if not group.get("hasBarLine", True):
+    if not genfrac_group.get("hasBarLine", True):
         node.set_attribute("linethickness", "0px")
-    elif group.get("barSize"):
-        rule_width = calculate_size(group["barSize"], options)
+    elif genfrac_group.get("barSize"):
+        rule_width = calculate_size(genfrac_group["barSize"], options)
         node.set_attribute("linethickness", make_em(rule_width))
 
-    style = adjust_style(group.get("size", "auto"), options.style)
+    style = adjust_style(genfrac_group.get("size", "auto"), options.style)
     if style.size != options.style.size:
         node = MathNode("mstyle", [node])
         is_display = "true" if style.size == Style.DISPLAY.size else "false"
         node.set_attribute("displaystyle", is_display)
         node.set_attribute("scriptlevel", "0")
 
-    if group.get("leftDelim") is not None or group.get("rightDelim") is not None:
+    if genfrac_group.get("leftDelim") is not None or genfrac_group.get("rightDelim") is not None:
         with_delims = []
 
-        if group.get("leftDelim") is not None:
-            left_text = group["leftDelim"].replace("\\", "")
+        if genfrac_group.get("leftDelim") is not None:
+            left_text = genfrac_group["leftDelim"].replace("\\", "")
             left_op = MathNode("mo", [mml.make_text(left_text, "math", options)])
             left_op.set_attribute("fence", "true")
             with_delims.append(left_op)
 
         with_delims.append(node)
 
-        if group.get("rightDelim") is not None:
-            right_text = group["rightDelim"].replace("\\", "")
+        if genfrac_group.get("rightDelim") is not None:
+            right_text = genfrac_group["rightDelim"].replace("\\", "")
             right_op = MathNode("mo", [mml.make_text(right_text, "math", options)])
             right_op.set_attribute("fence", "true")
             with_delims.append(right_op)

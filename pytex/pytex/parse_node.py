@@ -72,6 +72,9 @@ AnyParseNode = Union[
     'XArrowParseNode',
 ]
 
+# Compatibility alias matching KaTeX's ParseNode name
+ParseNode = AnyParseNode
+
 # Placeholder for symbols data
 try:
     from .symbols_data import NON_ATOMS
@@ -193,7 +196,9 @@ class VerbParseNode(BaseParseNode):
     star: bool
 
 
-# Symbol group nodes
+# Specialized nodes -------------------------------------------------
+
+
 class AtomParseNode(BaseParseNode):
     type: str  # "atom"
     family: Atom
@@ -272,7 +277,7 @@ class EnvironmentParseNode(BaseParseNode):
 class FontParseNode(BaseParseNode):
     type: str  # "font"
     font: str
-    body: AnyParseNode
+    body: List[AnyParseNode]
 
 
 class GenfracParseNode(BaseParseNode):
@@ -283,8 +288,8 @@ class GenfracParseNode(BaseParseNode):
     hasBarLine: bool
     leftDelim: Optional[str]
     rightDelim: Optional[str]
-    size: Union[StyleStr, str]  # StyleStr | "auto"
-    barSize: Optional[Measurement]
+    size: str
+    barSize: Optional[Dict[str, Any]]
 
 
 class HboxParseNode(BaseParseNode):
@@ -510,6 +515,8 @@ def check_symbol_node_type(node: Optional[AnyParseNode]) -> Optional[SymbolParse
 
 __all__ = [
     "AnyParseNode",
+    "ParseNode",
+    "PmbParseNode",
     "SymbolParseNode",
     "UnsupportedCmdParseNode",
     "assert_node_type",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span
 from ..define_function import define_function
@@ -12,7 +12,7 @@ from ..units import calculate_size, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import CrParseNode, ParseNode
 
 
 # Line break command (\\)
@@ -30,7 +30,7 @@ define_function({
 })
 
 
-def _cr_handler(context, args, opt_args) -> ParseNode:
+def _cr_handler(context, args, opt_args) -> Any:
     """Handler for line break (\\) command."""
     parser = context["parser"]
 
@@ -51,25 +51,27 @@ def _cr_handler(context, args, opt_args) -> ParseNode:
     }
 
 
-def _cr_html_builder(group: ParseNode, options: Options):
+def _cr_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for line breaks."""
+    cr_group = cast("CrParseNode", group)
     span = make_span(["mspace"], [], options)
 
-    if group.get("newLine"):
+    if cr_group.get("newLine"):
         span.classes.append("newline")
-        if group.get("size"):
-            span.style["marginTop"] = make_em(calculate_size(group["size"], options))
+        if cr_group.get("size"):
+            span.style["marginTop"] = make_em(calculate_size(cr_group["size"], options))
 
     return span
 
 
-def _cr_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _cr_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for line breaks."""
+    cr_group = cast("CrParseNode", group)
     node = MathNode("mspace")
 
-    if group.get("newLine"):
+    if cr_group.get("newLine"):
         node.set_attribute("linebreak", "newline")
-        if group.get("size"):
-            node.set_attribute("height", make_em(calculate_size(group["size"], options)))
+        if cr_group.get("size"):
+            node.set_attribute("height", make_em(calculate_size(cr_group["size"], options)))
 
     return node

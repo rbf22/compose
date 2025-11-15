@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ..define_function import define_function_builders
 from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, TagParseNode
 
 
 def pad():
@@ -26,19 +26,20 @@ define_function_builders({
 })
 
 
-def _tag_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _tag_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for equation tags."""
     from .. import build_mathml as mml
 
+    tag_group = cast("TagParseNode", group)
     table = MathNode("mtable", [
         MathNode("mtr", [
             pad(),
             MathNode("mtd", [
-                mml.build_expression_row(group["body"], options),
+                mml.build_expression_row(tag_group["body"], options),
             ]),
             pad(),
             MathNode("mtd", [
-                mml.build_expression_row(group["tag"], options),
+                mml.build_expression_row(tag_group["tag"], options),
             ]),
         ]),
     ])

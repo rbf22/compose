@@ -163,6 +163,12 @@ def ord_argument(arg: Any) -> List[Any]:
     return [arg]
 
 
+def ordargument(arg: Any) -> List[Any]:
+    """Compatibility wrapper for the camelCase KaTeX helper name."""
+
+    return ord_argument(arg)
+
+
 __all__ = [
     "define_function",
     "defineFunction",
@@ -176,4 +182,5 @@ __all__ = [
     "_mathmlGroupBuilders",
     "normalize_argument",
     "ord_argument",
+    "ordargument",
 ]

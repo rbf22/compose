@@ -2,31 +2,35 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, cast
 
 from ..build_common import make_fragment
 from ..define_function import define_function, ordargument
-from ..style import Style
+from ..style import Style, STYLES
+
+# Import style constants for easier access
+DISPLAY, DISPLAY_CRAMPED, TEXT, TEXT_CRAMPED, SCRIPT, SCRIPT_CRAMPED, SCRIPTSCRIPT, SCRIPTSCRIPT_CRAMPED = STYLES
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import MathchoiceParseNode, ParseNode
 
 
-def choose_math_style(group: ParseNode, options: Options):
+def choose_math_style(group: ParseNode, options: "Options") -> List:
     """Choose the appropriate math expression based on current style."""
+    mathchoice_group = cast("MathchoiceParseNode", group)
     style_size = options.style.size
 
-    if style_size == Style.DISPLAY.size:
-        return group["display"]
-    elif style_size == Style.TEXT.size:
-        return group["text"]
-    elif style_size == Style.SCRIPT.size:
-        return group["script"]
-    elif style_size == Style.SCRIPTSCRIPT.size:
-        return group["scriptscript"]
+    if style_size == DISPLAY.size:
+        return mathchoice_group["display"]
+    elif style_size == TEXT.size:
+        return mathchoice_group["text"]
+    elif style_size == SCRIPT.size:
+        return mathchoice_group["script"]
+    elif style_size == SCRIPTSCRIPT.size:
+        return mathchoice_group["scriptscript"]
     else:
-        return group["text"]
+        return mathchoice_group["text"]
 
 
 # \mathchoice command for style-dependent expressions
@@ -50,7 +54,7 @@ define_function({
 })
 
 
-def _mathchoice_html_builder(group: ParseNode, options: Options):
+def _mathchoice_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for mathchoice - choose expression based on style."""
     from .. import build_html as html
 
@@ -59,7 +63,7 @@ def _mathchoice_html_builder(group: ParseNode, options: Options):
     return make_fragment(elements)
 
 
-def _mathchoice_mathml_builder(group: ParseNode, options: Options):
+def _mathchoice_mathml_builder(group: ParseNode, options: "Options") -> Any:
     """Build MathML for mathchoice - choose expression based on style."""
     from .. import build_mathml as mml
 

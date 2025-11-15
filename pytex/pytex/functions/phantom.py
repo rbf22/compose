@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_fragment, make_span, make_v_list
 from ..define_function import define_function, ordargument
@@ -10,7 +10,7 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import HphantomParseNode, ParseNode, PhantomParseNode, VphantomParseNode
 
 
 # \phantom - invisible box with full dimensions
@@ -65,12 +65,13 @@ define_function({
 })
 
 
-def _phantom_html_builder(group: ParseNode, options: Options):
+def _phantom_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for \phantom."""
     from .. import build_html as html
 
+    phantom_group = cast("PhantomParseNode", group)
     elements = html.build_expression(
-        group["body"],
+        phantom_group["body"],
         options.with_phantom(),
         False
     )
@@ -79,20 +80,22 @@ def _phantom_html_builder(group: ParseNode, options: Options):
     return make_fragment(elements)
 
 
-def _phantom_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _phantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for \phantom."""
     from .. import build_mathml as mml
 
-    inner = mml.build_expression(group["body"], options)
+    phantom_group = cast("PhantomParseNode", group)
+    inner = mml.build_expression(phantom_group["body"], options)
     return MathNode("mphantom", inner)
 
 
-def _hphantom_html_builder(group: ParseNode, options: Options):
+def _hphantom_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for \hphantom."""
     from .. import build_html as html
 
+    hphantom_group = cast("HphantomParseNode", group)
     node = make_span(
-        [], [html.build_group(group["body"], options.with_phantom())]
+        [], [html.build_group(hphantom_group["body"], options.with_phantom())]
     )
     node.height = 0
     node.depth = 0
@@ -113,11 +116,12 @@ def _hphantom_html_builder(group: ParseNode, options: Options):
     return make_span(["mord"], [node], options)
 
 
-def _hphantom_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _hphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for \hphantom."""
     from .. import build_mathml as mml
 
-    inner = mml.build_expression(ordargument(group["body"]), options)
+    hphantom_group = cast("HphantomParseNode", group)
+    inner = mml.build_expression(ordargument(hphantom_group["body"]), options)
     phantom = MathNode("mphantom", inner)
     node = MathNode("mpadded", [phantom])
     node.set_attribute("height", "0px")
@@ -125,24 +129,26 @@ def _hphantom_mathml_builder(group: ParseNode, options: Options) -> MathNode:
     return node
 
 
-def _vphantom_html_builder(group: ParseNode, options: Options):
+def _vphantom_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for \vphantom."""
     from .. import build_html as html
 
+    vphantom_group = cast("VphantomParseNode", group)
     inner = make_span(
         ["inner"],
-        [html.build_group(group["body"], options.with_phantom())]
+        [html.build_group(vphantom_group["body"], options.with_phantom())]
     )
     fix = make_span(["fix"], [])
 
     return make_span(["mord", "rlap"], [inner, fix], options)
 
 
-def _vphantom_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _vphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for \vphantom."""
     from .. import build_mathml as mml
 
-    inner = mml.build_expression(ordargument(group["body"]), options)
+    vphantom_group = cast("VphantomParseNode", group)
+    inner = mml.build_expression(ordargument(vphantom_group["body"]), options)
     phantom = MathNode("mphantom", inner)
     node = MathNode("mpadded", [phantom])
     node.set_attribute("width", "0px")

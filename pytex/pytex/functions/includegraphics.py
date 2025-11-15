@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..define_function import define_function
 from ..parse_error import ParseError
@@ -11,7 +11,7 @@ from ..units import calculate_size, valid_unit, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import IncludegraphicsParseNode, ParseNode
 
 
 def size_data(size_str: str):
@@ -110,17 +110,18 @@ def _includegraphics_handler(context, args, opt_args) -> ParseNode:
     }
 
 
-def _includegraphics_html_builder(group: ParseNode, options: Options):
+def _includegraphics_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for includegraphics."""
-    height = calculate_size(group["height"], options)
+    ig_group = cast("IncludegraphicsParseNode", group)
+    height = calculate_size(ig_group["height"], options)
     depth = 0
 
-    if group["totalheight"]["number"] > 0:
-        depth = calculate_size(group["totalheight"], options) - height
+    if ig_group["totalheight"]["number"] > 0:
+        depth = calculate_size(ig_group["totalheight"], options) - height
 
     width = 0
-    if group["width"]["number"] > 0:
-        width = calculate_size(group["width"], options)
+    if ig_group["width"]["number"] > 0:
+        width = calculate_size(ig_group["width"], options)
 
     style = {"height": make_em(height + depth)}
     if width > 0:
@@ -130,32 +131,33 @@ def _includegraphics_html_builder(group: ParseNode, options: Options):
 
     # Create image node
     from ..dom_tree import Img
-    node = Img(group["src"], group["alt"], style)
+    node = Img(ig_group["src"], ig_group["alt"], style)
     node.height = height
     node.depth = depth
 
     return node
 
 
-def _includegraphics_mathml_builder(group: ParseNode, options: Options):
+def _includegraphics_mathml_builder(group: ParseNode, options: "Options") -> Any:
     """Build MathML for includegraphics."""
     from ..mathml_tree import MathNode
 
+    ig_group = cast("IncludegraphicsParseNode", group)
     node = MathNode("mglyph", [])
-    node.set_attribute("alt", group["alt"])
-    node.set_attribute("src", group["src"])
+    node.set_attribute("alt", ig_group["alt"])
+    node.set_attribute("src", ig_group["src"])
 
-    height = calculate_size(group["height"], options)
+    height = calculate_size(ig_group["height"], options)
     depth = 0
 
-    if group["totalheight"]["number"] > 0:
-        depth = calculate_size(group["totalheight"], options) - height
+    if ig_group["totalheight"]["number"] > 0:
+        depth = calculate_size(ig_group["totalheight"], options) - height
         node.set_attribute("valign", make_em(-depth))
 
     node.set_attribute("height", make_em(height + depth))
 
-    if group["width"]["number"] > 0:
-        width = calculate_size(group["width"], options)
+    if ig_group["width"]["number"] > 0:
+        width = calculate_size(ig_group["width"], options)
         node.set_attribute("width", make_em(width))
 
     return node

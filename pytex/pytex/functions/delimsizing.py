@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span
 from ..define_function import define_function
@@ -13,7 +13,7 @@ from ..units import make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import AnyParseNode, ParseNode, SymbolParseNode
+    from ..parse_node import AnyParseNode, DelimsizingParseNode, LeftrightParseNode, MiddleParseNode, ParseNode, SymbolParseNode
     from ..define_function import FunctionContext
 
 # Delimiter size configurations
@@ -146,34 +146,36 @@ def _delimsizing_handler(context, args):
     }
 
 
-def _delimsizing_html_builder(group: ParseNode, options: Options):
+def _delimsizing_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for sized delimiters."""
 
-    if group["delim"] == ".":
+    delimsizing_group = cast("DelimsizingParseNode", group)
+    if delimsizing_group["delim"] == ".":
         # Empty delimiters still count as elements
-        return make_span([group["mclass"]])
+        return make_span([delimsizing_group["mclass"]])
 
     # Use delimiter.sizedDelim to generate the delimiter
     from .. import delimiter
     return delimiter.make_sized_delim(
-        group["delim"], group["size"], options, group.get("mode", "math"),
-        [group["mclass"]]
+        delimsizing_group["delim"], delimsizing_group["size"], options, delimsizing_group.get("mode", "math"),
+        [delimsizing_group["mclass"]]
     )
 
 
-def _delimsizing_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _delimsizing_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for sized delimiters."""
     from .. import build_mathml as mml
     from .. import delimiter
 
+    delimsizing_group = cast("DelimsizingParseNode", group)
     children = []
 
-    if group["delim"] != ".":
-        children.append(mml.make_text(group["delim"], group.get("mode", "math")))
+    if delimsizing_group["delim"] != ".":
+        children.append(mml.make_text(delimsizing_group["delim"], delimsizing_group.get("mode", "math")))
 
     node = MathNode("mo", children)
 
-    if group["mclass"] in ("mopen", "mclose"):
+    if delimsizing_group["mclass"] in ("mopen", "mclose"):
         # Fence delimiters
         node.set_attribute("fence", "true")
     else:
@@ -181,7 +183,7 @@ def _delimsizing_mathml_builder(group: ParseNode, options: Options) -> MathNode:
         node.set_attribute("fence", "false")
 
     node.set_attribute("stretchy", "true")
-    size = make_em(delimiter.SIZE_TO_MAX_HEIGHT.get(group["size"], 0))
+    size = make_em(delimiter.SIZE_TO_MAX_HEIGHT.get(delimsizing_group["size"], 0))
     node.set_attribute("minsize", size)
     node.set_attribute("maxsize", size)
 
@@ -227,14 +229,15 @@ def _left_handler(context, args):
     }
 
 
-def _leftright_html_builder(group: ParseNode, options: Options):
+def _leftright_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for \left...\right delimiters."""
     from .. import build_html as html
 
-    assert_parsed(group)
+    leftright_group = cast("LeftrightParseNode", group)
+    assert_parsed(leftright_group)
 
     # Build the inner expression
-    inner = html.build_expression(group["body"], options, True, ["mopen", "mclose"])
+    inner = html.build_expression(leftright_group["body"], options, True, ["mopen", "mclose"])
 
     inner_height = 0
     inner_depth = 0
@@ -254,12 +257,12 @@ def _leftright_html_builder(group: ParseNode, options: Options):
 
     # Left delimiter
     from .. import delimiter
-    if group["left"] == ".":
+    if leftright_group["left"] == ".":
         left_delim = html.make_null_delimiter(options, ["mopen"])
     else:
         left_delim = delimiter.make_left_right_delim(
-            group["left"], inner_height, inner_depth, options,
-            group.get("mode", "math"), ["mopen"]
+            leftright_group["left"], inner_height, inner_depth, options,
+            leftright_group.get("mode", "math"), ["mopen"]
         )
     inner.insert(0, left_delim)
 
@@ -272,42 +275,43 @@ def _leftright_html_builder(group: ParseNode, options: Options):
                 middle_info = item.is_middle
                 inner[i] = delimiter.make_left_right_delim(
                     middle_info["delim"], inner_height, inner_depth,
-                    middle_info["options"], group.get("mode", "math"), []
+                    middle_info["options"], leftright_group.get("mode", "math"), []
                 )
 
     # Right delimiter (with color support)
-    if group["right"] == ".":
+    if leftright_group["right"] == ".":
         right_delim = html.make_null_delimiter(options, ["mclose"])
     else:
-        color_options = (options.with_color(group["rightColor"])
-                        if group.get("rightColor") else options)
+        color_options = (options.with_color(leftright_group["rightColor"])
+                        if leftright_group.get("rightColor") else options)
         right_delim = delimiter.make_left_right_delim(
-            group["right"], inner_height, inner_depth, color_options,
-            group.get("mode", "math"), ["mclose"]
+            leftright_group["right"], inner_height, inner_depth, color_options,
+            leftright_group.get("mode", "math"), ["mclose"]
         )
     inner.append(right_delim)
 
     return make_span(["minner"], inner, options)
 
 
-def _leftright_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _leftright_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for \left...\right delimiters."""
     from .. import build_mathml as mml
 
-    assert_parsed(group)
-    inner = mml.build_expression(group["body"], options)
+    leftright_group = cast("LeftrightParseNode", group)
+    assert_parsed(leftright_group)
+    inner = mml.build_expression(leftright_group["body"], options)
 
-    if group["left"] != ".":
-        left_node = MathNode("mo", [mml.make_text(group["left"], group.get("mode", "math"))])
+    if leftright_group["left"] != ".":
+        left_node = MathNode("mo", [mml.make_text(leftright_group["left"], leftright_group.get("mode", "math"))])
         left_node.set_attribute("fence", "true")
         inner.insert(0, left_node)
 
-    if group["right"] != ".":
-        right_node = MathNode("mo", [mml.make_text(group["right"], group.get("mode", "math"))])
+    if leftright_group["right"] != ".":
+        right_node = MathNode("mo", [mml.make_text(leftright_group["right"], leftright_group.get("mode", "math"))])
         right_node.set_attribute("fence", "true")
 
-        if group.get("rightColor"):
-            right_node.set_attribute("mathcolor", group["rightColor"])
+        if leftright_group.get("rightColor"):
+            right_node.set_attribute("mathcolor", leftright_group["rightColor"])
 
         inner.append(right_node)
 
@@ -328,36 +332,38 @@ def _middle_handler(context, args):
     }
 
 
-def _middle_html_builder(group: ParseNode, options: Options):
+def _middle_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for \middle delimiters."""
     from .. import build_html as html
     from .. import delimiter
 
-    if group["delim"] == ".":
+    middle_group = cast("MiddleParseNode", group)
+    if middle_group["delim"] == ".":
         middle_delim = html.make_null_delimiter(options, [])
     else:
         middle_delim = delimiter.make_sized_delim(
-            group["delim"], 1, options, group.get("mode", "math"), []
+            middle_group["delim"], 1, options, middle_group.get("mode", "math"), []
         )
 
         # Store middle information for later processing
         middle_delim.is_middle = {
-            "delim": group["delim"],
+            "delim": middle_group["delim"],
             "options": options
         }
 
     return middle_delim
 
 
-def _middle_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _middle_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for \middle delimiters."""
     from .. import build_mathml as mml
 
+    middle_group = cast("MiddleParseNode", group)
     # Use plain "|" instead of \vert for Firefox compatibility
-    if group["delim"] in ("\\vert", "|"):
+    if middle_group["delim"] in ("\\vert", "|"):
         text_node = mml.make_text("|", "text")
     else:
-        text_node = mml.make_text(group["delim"], group.get("mode", "math"))
+        text_node = mml.make_text(middle_group["delim"], middle_group.get("mode", "math"))
 
     middle_node = MathNode("mo", [text_node])
     middle_node.set_attribute("fence", "true")

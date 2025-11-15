@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span, make_v_list
 from ..define_function import define_function
@@ -10,7 +10,7 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import AccentUnderParseNode, ParseNode
 
 
 # Under-accent functions
@@ -34,19 +34,20 @@ define_function({
 })
 
 
-def _accent_under_html_builder(group: ParseNode, options: Options):
+def _accent_under_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for under-accent commands."""
     from .. import build_html as html
     from .. import stretchy
 
+    accent_under_group = cast("AccentUnderParseNode", group)
     # Build the base group
-    inner_group = html.build_group(group["base"], options)
+    inner_group = html.build_group(accent_under_group["base"], options)
 
     # Create the stretchy accent
-    accent_body = stretchy.svg_span(group, options)
+    accent_body = stretchy.svg_span(accent_under_group, options)
 
     # Kern adjustment for \utilde
-    kern = 0.12 if group["label"] == "\\utilde" else 0
+    kern = 0.12 if accent_under_group["label"] == "\\utilde" else 0
 
     # Generate the vlist
     vlist = make_v_list({
@@ -62,15 +63,16 @@ def _accent_under_html_builder(group: ParseNode, options: Options):
     return make_span(["mord", "accentunder"], [vlist], options)
 
 
-def _accent_under_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _accent_under_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for under-accent commands."""
     from .. import build_mathml as mml
     from .. import stretchy
 
-    accent_node = stretchy.math_ml_node(group["label"])
+    accent_under_group = cast("AccentUnderParseNode", group)
+    accent_node = stretchy.math_ml_node(accent_under_group["label"])
     node = MathNode(
         "munder",
-        [mml.build_group(group["base"], options), accent_node]
+        [mml.build_group(accent_under_group["base"], options), accent_node]
     )
     node.set_attribute("accentunder", "true")
 

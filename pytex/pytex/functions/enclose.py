@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span, make_v_list, wrap_fragment
 from ..define_function import define_function
@@ -14,23 +14,24 @@ from ..utils import is_character_box
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import EncloseParseNode, ParseNode
 
 
-def html_builder(group: ParseNode, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for enclosure commands."""
     from .. import build_html as html
 
+    enclose_group = cast("EncloseParseNode", group)
     # Build the inner content
-    inner = wrap_fragment(html.build_group(group["body"], options), options)
+    inner = wrap_fragment(html.build_group(enclose_group["body"], options), options)
 
-    label = group["label"][1:]  # Remove backslash
+    label = enclose_group["label"][1:]  # Remove backslash
     scale = options.size_multiplier
     img = None
     img_shift = 0
 
     # Check if single character (affects geometry)
-    is_single_char = is_character_box(group["body"])
+    is_single_char = is_character_box(enclose_group["body"])
 
     if label == "sout":
         # Strikethrough
@@ -116,13 +117,13 @@ def html_builder(group: ParseNode, options: Options):
 
         img_shift = inner.depth + bottom_pad
 
-        if group.get("backgroundColor"):
-            img.style["backgroundColor"] = group["backgroundColor"]
-            if group.get("borderColor"):
-                img.style["borderColor"] = group["borderColor"]
+        if enclose_group.get("backgroundColor"):
+            img.style["backgroundColor"] = enclose_group["backgroundColor"]
+            if enclose_group.get("borderColor"):
+                img.style["borderColor"] = enclose_group["borderColor"]
 
     # Create vlist
-    if group.get("backgroundColor"):
+    if enclose_group.get("backgroundColor"):
         vlist = make_v_list({
             "positionType": "individualShift",
             "children": [
@@ -159,14 +160,15 @@ def html_builder(group: ParseNode, options: Options):
         return make_span(["mord"], [vlist], options)
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for enclosure commands."""
     from .. import build_mathml as mml
 
-    label = group["label"]
+    enclose_group = cast("EncloseParseNode", group)
+    label = enclose_group["label"]
     node = MathNode(
         "mpadded" if "colorbox" in label else "menclose",
-        [mml.build_group(group["body"], options)]
+        [mml.build_group(enclose_group["body"], options)]
     )
 
     if label == "\\cancel":
@@ -195,13 +197,13 @@ def mathml_builder(group: ParseNode, options: Options) -> MathNode:
                 options.font_metrics().get("fboxrule", 0.4),  # default
                 options.min_rule_thickness,  # user override
             )
-            border_color = group.get("borderColor", "black")
+            border_color = enclose_group.get("borderColor", "black")
             node.set_attribute("style", f"border: {thk}em solid {border_color}")
     elif label == "\\xcancel":
         node.set_attribute("notation", "updiagonalstrike downdiagonalstrike")
 
-    if group.get("backgroundColor"):
-        node.set_attribute("mathbackground", group["backgroundColor"])
+    if enclose_group.get("backgroundColor"):
+        node.set_attribute("mathbackground", enclose_group["backgroundColor"])
 
     return node
 

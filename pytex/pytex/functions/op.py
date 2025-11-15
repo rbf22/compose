@@ -2,143 +2,160 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union, cast
 
 from ..build_common import make_span, make_symbol, make_v_list, mathsym, static_svg
 from ..define_function import define_function, ordargument
-from ..dom_tree import SymbolNode
-from ..mathml_tree import MathNode
+from ..dom_tree import DomNode, DomSpan, SymbolNode
+from ..mathml_tree import MathNode, TextNode
+from ..parse_node import AnyParseNode, OpParseNode, ParseNode
 from ..style import Style
+from ..types import Mode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
 
 # Operators that don't have large successors
 NO_SUCCESSOR = ["\\smallint"]
 
-def html_builder(group: ParseNode, options: Options):
+
+def _as_mode(value: Any) -> Mode:
+    try:
+        return Mode(value)
+    except ValueError:
+        return Mode.MATH
+
+
+def _normalize_body(group: Mapping[str, Any]) -> List[AnyParseNode]:
+    raw_body = group.get("body")
+    if not isinstance(raw_body, list):
+        return []
+    typed_nodes = [cast(AnyParseNode, node) for node in raw_body if isinstance(node, dict)]
+    return typed_nodes
+
+
+def _build_text_operator(name: str, mode: Mode, options: "Options") -> DomSpan:
+    characters = [mathsym(ch, mode, options) for ch in name]
+    dom_children = cast(List[DomNode], characters)
+    return make_span(["mop"], dom_children, options)
+
+
+def html_builder(group: ParseNode, options: "Options") -> DomSpan:
     """Build HTML for operator group."""
     from .. import build_html as html
 
-    # Handle supsub delegation
-    sup_group = None
-    sub_group = None
+    op_group = cast("OpParseNode", group)
+    sup_group: Optional[AnyParseNode] = None
+    sub_group: Optional[AnyParseNode] = None
+    op_group_map: Mapping[str, Any] = op_group
     has_limits = False
 
-    if group.get("type") == "supsub":
-        sup_group = group.get("sup")
-        sub_group = group.get("sub")
-        group = group["base"]  # The op is in the base
+    if op_group.get("type") == "supsub":
+        sup_group = cast(Optional[AnyParseNode], op_group.get("sup"))
+        sub_group = cast(Optional[AnyParseNode], op_group.get("sub"))
+        op_group_map = cast(Mapping[str, Any], op_group.get("base", op_group))
         has_limits = True
 
     style = options.style
+    large = (
+        style.size == Style.DISPLAY.size
+        and op_group_map.get("symbol")
+        and op_group_map.get("name") not in NO_SUCCESSOR
+    )
 
-    # Determine if operator should be large
-    large = (style.size == Style.DISPLAY.size and
-            group.get("symbol") and
-            group.get("name") not in NO_SUCCESSOR)
+    base: DomSpan
+    name = op_group_map.get("name", "")
 
-    # Build the base operator
-    if group.get("symbol"):
+    if op_group_map.get("symbol"):
         font_name = "Size2-Regular" if large else "Size1-Regular"
-
-        name = group.get("name", "")
         stash = ""
-
-        # Handle special cases for \oiint, \oiiint
         if name in ("\\oiint", "\\oiiint"):
-            stash = name[1:]  # Remove backslash
+            stash = name[1:]
             name = "\\iint" if stash == "oiint" else "\\iiint"
 
-        base = make_symbol(name, font_name, "math", options,
-                          ["mop", "op-symbol", "large-op" if large else "small-op"])
+        symbol_node = make_symbol(
+            name,
+            font_name,
+            Mode.MATH,
+            options,
+            ["mop", "op-symbol", "large-op" if large else "small-op"],
+        )
+        base = make_span(list(symbol_node.classes), [symbol_node], options)
+        symbol_slant = symbol_node.italic
 
         if stash:
-            # Overlay the oval for \oiint, \oiiint
-            italic = base.italic
             oval = static_svg(f"{stash}Size{'2' if large else '1'}", options)
-
-            base = make_v_list({
-                "positionType": "individualShift",
-                "children": [
-                    {"type": "elem", "elem": base, "shift": 0},
-                    {"type": "elem", "elem": oval, "shift": 0.08 if large else 0},
-                ],
-            }, options)
-
-            name = f"\\{stash}"
+            base = make_v_list(
+                {
+                    "positionType": "individualShift",
+                    "children": [
+                        {"type": "elem", "elem": base, "shift": 0},
+                        {"type": "elem", "elem": oval, "shift": 0.08 if large else 0.0},
+                    ],
+                },
+                options,
+            )
             base.classes.insert(0, "mop")
-            base.italic = italic
+            base_slant = symbol_slant
+        else:
+            base_slant = symbol_slant
 
-    elif group.get("body"):
-        # Operator with body content
-        inner = html.build_expression(group["body"], options, True)
+    elif op_group_map.get("body"):
+        inner_nodes = _normalize_body(op_group_map)
+        inner = html.build_expression(inner_nodes, options, True)
         if len(inner) == 1 and isinstance(inner[0], SymbolNode):
-            base = inner[0]
-            base.classes[0] = "mop"
+            symbol_node = inner[0]
+            symbol_node.classes[0] = "mop"
+            base = make_span(list(symbol_node.classes), [symbol_node], options)
+            base_slant = symbol_node.italic
         else:
             base = make_span(["mop"], inner, options)
+            base_slant = 0.0
 
     else:
-        # Text operator
-        name = group.get("name", "")
-        output = []
-        for i in range(1, len(name)):
-            output.append(mathsym(name[i], group.get("mode", "math"), options))
-        base = make_span(["mop"], output, options)
+        mode = _as_mode(op_group_map.get("mode", Mode.MATH))
+        base = _build_text_operator(name[1:] if name.startswith("\\") else name, mode, options)
+        base_slant = 0.0
 
-    # Calculate base shift and slant
-    base_shift = 0
-    slant = 0
-
-    if ((isinstance(base, SymbolNode) or
-         group.get("name") in ("\\oiint", "\\oiiint")) and
-        not group.get("suppressBaseShift", False)):
-
-        # Shift so center lies on axis (rule 13)
-        base_shift = (base.height - base.depth) / 2 - options.font_metrics().get("axisHeight", 0)
-        slant = base.italic
+    base_shift = 0.0
+    slant = base_slant
+    if (
+        op_group_map.get("symbol")
+        or name in ("\\oiint", "\\oiiint")
+    ) and not op_group_map.get("suppressBaseShift", False):
+        base_shift = (base.height - base.depth) / 2 - options.font_metrics().get("axisHeight", 0.0)
 
     if has_limits:
-        # Use supsub assembly for limits
-        return assemble_sup_sub(base, sup_group, sub_group, options, style, slant, base_shift)
-    else:
-        # Apply base shift directly
-        if base_shift:
-            base.style["position"] = "relative"
-            base.style["top"] = f"{base_shift}em"
-        return base
+        return assembleSupSub(base, sup_group, sub_group, options, style, slant, base_shift)
+
+    if base_shift:
+        base.style["position"] = "relative"
+        base.style["top"] = f"{base_shift:.4f}em"
+    return base
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for operator group."""
     from .. import build_mathml as mml
 
-    if group.get("symbol"):
-        # Symbol operator
-        node = MathNode("mo", [mml.make_text(group.get("name", ""), group.get("mode", "math"))])
-        if group.get("name") in NO_SUCCESSOR:
+    op_group = cast("OpParseNode", group)
+    if op_group.get("symbol"):
+        mode = _as_mode(op_group.get("mode", Mode.MATH))
+        node = MathNode("mo", [mml.make_text(op_group.get("name", ""), mode)])
+        if op_group.get("name") in NO_SUCCESSOR:
             node.set_attribute("largeop", "false")
+        return node
 
-    elif group.get("body"):
-        # Operator with body
-        node = MathNode("mo", mml.build_expression(group["body"], options))
+    if op_group.get("body"):
+        body_nodes = _normalize_body(op_group)
+        return MathNode("mo", mml.build_expression(body_nodes, options))
 
-    else:
-        # Text operator
-        name = group.get("name", "")
-        node = MathNode("mi", [MathNode.TextNode(name[1:])])  # Skip backslash
-
-        # Append ApplyFunction operator
-        operator = MathNode("mo", [mml.make_text("\u2061", "text")])
-        if group.get("parentIsSupSub"):
-            node = MathNode("mrow", [node, operator])
-        else:
-            # Would need DocumentFragment equivalent
-            node = MathNode("mrow", [node, operator])
-
-    return node
+    name = op_group.get("name", "")
+    identifier = MathNode("mi", [TextNode(name[1:])])
+    operator = MathNode("mo", [mml.make_text("\u2061", Mode.TEXT)])
+    if op_group.get("parentIsSupSub"):
+        return MathNode("mrow", [identifier, operator])
+    return MathNode("mrow", [identifier, operator])
 
 
 # Single character big operators mapping
@@ -253,15 +270,13 @@ define_function({
 })
 
 
-def _op_handler(context, args, limits: bool, symbol: bool):
+def _op_handler(context: Dict[str, Any], args: List[AnyParseNode], limits: bool, symbol: bool) -> Dict[str, Any]:
     """Common handler for operator functions."""
     func_name = context["funcName"]
-
-    # Handle single character operators
     if len(func_name) == 1:
         if symbol and limits:
             func_name = SINGLE_CHAR_BIG_OPS.get(func_name, func_name)
-        elif symbol and not limits:
+        elif symbol:
             func_name = SINGLE_CHAR_INTEGRALS.get(func_name, func_name)
 
     return {
@@ -276,11 +291,16 @@ def _op_handler(context, args, limits: bool, symbol: bool):
 
 # Import assembleSupSub utility
 try:
-    from .utils.assembleSupSub import assembleSupSub as assemble_sup_sub
+    from .utils.assembleSupSub import assembleSupSub
 except ImportError:
-    # Fallback if utils not available
-    def assemble_sup_sub(base, sup_group, sub_group, options, style, slant, base_shift):
-        """Fallback assembly for sup/sub on operators."""
-        # This would need the full implementation from utils/assembleSupSub.js
-        # For now, just return the base
-        return base
+    def assembleSupSub(
+        base: Union[SymbolNode, DomSpan],
+        sup_group: Optional[AnyParseNode],
+        sub_group: Optional[AnyParseNode],
+        options: "Options",
+        style: Any,
+        slant: float,
+        base_shift: float,
+    ) -> DomSpan:
+        span = base if isinstance(base, DomSpan) else make_span(list(base.classes), [base], options)
+        return span

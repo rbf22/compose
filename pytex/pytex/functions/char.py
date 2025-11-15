@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from ..define_function import define_function
 from ..parse_error import ParseError
@@ -24,7 +24,7 @@ define_function({
 })
 
 
-def _char_handler(context, args) -> ParseNode:
+def _char_handler(context: Dict[str, Any], args: List["ParseNode"]) -> Dict[str, Any]:
     """Handler for \@char command that creates characters from code points."""
     arg = assert_node_type(args[0], "ordgroup")
     group = arg["body"]

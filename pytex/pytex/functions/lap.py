@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, cast
 
 from ..build_common import make_span
 from ..define_function import define_function
@@ -11,7 +11,7 @@ from ..units import make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import LapParseNode, ParseNode
 
 
 # Define lap functions
@@ -33,20 +33,21 @@ define_function({
 })
 
 
-def _lap_html_builder(group: ParseNode, options: Options):
+def _lap_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for lap commands."""
     from .. import build_html as html
 
-    alignment = group["alignment"]
+    lap_group = cast("LapParseNode", group)
+    alignment = lap_group["alignment"]
 
     if alignment == "clap":
         # Center alignment - special handling
-        inner = make_span([], [html.build_group(group["body"], options)])
+        inner = make_span([], [html.build_group(lap_group["body"], options)])
         # Wrap for CSS centering
         inner = make_span(["inner"], [inner], options)
     else:
         # Left or right alignment
-        inner = make_span(["inner"], [html.build_group(group["body"], options)])
+        inner = make_span(["inner"], [html.build_group(lap_group["body"], options)])
 
     fix = make_span(["fix"], [])
     node = make_span([alignment], [inner, fix], options)
@@ -63,13 +64,14 @@ def _lap_html_builder(group: ParseNode, options: Options):
     return make_span(["mord", "vbox"], [node], options)
 
 
-def _lap_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _lap_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for lap commands."""
     from .. import build_mathml as mml
 
-    node = MathNode("mpadded", [mml.build_group(group["body"], options)])
+    lap_group = cast("LapParseNode", group)
+    node = MathNode("mpadded", [mml.build_group(lap_group["body"], options)])
 
-    alignment = group["alignment"]
+    alignment = lap_group["alignment"]
 
     # Set horizontal offset
     if alignment != "rlap":

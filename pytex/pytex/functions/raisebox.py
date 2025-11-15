@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_v_list
 from ..define_function import define_function
@@ -12,7 +12,7 @@ from ..units import calculate_size
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, RaiseboxParseNode
 
 
 # Raisebox for vertical positioning
@@ -35,12 +35,13 @@ define_function({
 })
 
 
-def _raisebox_html_builder(group: ParseNode, options: Options):
+def _raisebox_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for raisebox."""
     from .. import build_html as html
 
-    body = html.build_group(group["body"], options)
-    dy = calculate_size(group["dy"], options)
+    raisebox_group = cast("RaiseboxParseNode", group)
+    body = html.build_group(raisebox_group["body"], options)
+    dy = calculate_size(raisebox_group["dy"], options)
 
     return make_v_list({
         "positionType": "shift",
@@ -49,12 +50,13 @@ def _raisebox_html_builder(group: ParseNode, options: Options):
     }, options)
 
 
-def _raisebox_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _raisebox_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for raisebox."""
     from .. import build_mathml as mml
 
-    node = MathNode("mpadded", [mml.build_group(group["body"], options)])
-    dy = f"{group['dy']['number']}{group['dy']['unit']}"
+    raisebox_group = cast("RaiseboxParseNode", group)
+    node = MathNode("mpadded", [mml.build_group(raisebox_group["body"], options)])
+    dy = f"{raisebox_group['dy']['number']}{raisebox_group['dy']['unit']}"
     node.set_attribute("voffset", dy)
 
     return node

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span
 from ..define_function import define_function, ordargument
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, TextParseNode
 
 # Text font families
 TEXT_FONT_FAMILIES = {
@@ -33,9 +33,10 @@ TEXT_FONT_SHAPES = {
 }
 
 
-def options_with_font(group: ParseNode, options: Options) -> Options:
+def options_with_font(group: ParseNode, options: "Options") -> "Options":
     """Create options with appropriate font settings."""
-    font = group.get("font")
+    text_group = cast("TextParseNode", group)
+    font = text_group.get("font")
     if not font:
         return options
     elif font in TEXT_FONT_FAMILIES and TEXT_FONT_FAMILIES[font]:
@@ -79,18 +80,20 @@ define_function({
 })
 
 
-def _text_html_builder(group: ParseNode, options: Options):
+def _text_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for text commands."""
     from .. import build_html as html
 
-    new_options = options_with_font(group, options)
-    inner = html.build_expression(group["body"], new_options, True)
+    text_group = cast("TextParseNode", group)
+    new_options = options_with_font(text_group, options)
+    inner = html.build_expression(text_group["body"], new_options, True)
     return make_span(["mord", "text"], inner, new_options)
 
 
-def _text_mathml_builder(group: ParseNode, options: Options):
+def _text_mathml_builder(group: ParseNode, options: "Options") -> Any:
     """Build MathML for text commands."""
     from .. import build_mathml as mml
 
-    new_options = options_with_font(group, options)
-    return mml.build_expression_row(group["body"], new_options)
+    text_group = cast("TextParseNode", group)
+    new_options = options_with_font(text_group, options)
+    return mml.build_expression_row(text_group["body"], new_options)

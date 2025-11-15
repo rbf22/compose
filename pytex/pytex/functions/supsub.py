@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span, make_v_list
 from ..dom_tree import SymbolNode
@@ -14,12 +14,13 @@ from ..utils import is_character_box
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, SupsubParseNode
 
 
-def html_builder_delegate(group: ParseNode, options: Options):
+def html_builder_delegate(group: ParseNode, options: "Options") -> Any:
     """Check if inner group should handle sup/sub itself."""
-    base = group.get("base")
+    supsub_group = cast("SupsubParseNode", group)
+    base = supsub_group.get("base")
     if not base:
         return None
     elif base.get("type") == "op":
@@ -35,25 +36,26 @@ def html_builder_delegate(group: ParseNode, options: Options):
     elif base.get("type") == "accent":
         return is_character_box(base.get("base"))  # Would return accent.html_builder
     elif base.get("type") == "horizBrace":
-        is_sup = not group.get("sub")
+        is_sup = not supsub_group.get("sub")
         return is_sup == base.get("isOver")  # Would return horizBrace.html_builder
     else:
         return None
 
 
-def html_builder(group: ParseNode, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for superscript/subscript group."""
     from .. import build_html as html
 
+    supsub_group = cast("SupsubParseNode", group)
     # Check if inner group should handle sup/sub itself
-    builder_delegate = html_builder_delegate(group, options)
+    builder_delegate = html_builder_delegate(supsub_group, options)
     if builder_delegate:
         # Would delegate to appropriate builder
         pass
 
-    value_base = group.get("base")
-    value_sup = group.get("sup")
-    value_sub = group.get("sub")
+    value_base = supsub_group.get("base")
+    value_sup = supsub_group.get("sup")
+    value_sub = supsub_group.get("sub")
 
     base = html.build_group(value_base, options)
     supm = None
@@ -96,10 +98,10 @@ def html_builder(group: ParseNode, options: Options):
     margin_left = None
     if subm:
         # Handle italic correction for subscripts
-        is_oiint = (group.get("base") and
-                   group["base"].get("type") == "op" and
-                   group["base"].get("name") and
-                   group["base"]["name"] in ("\\oiint", "\\oiiint"))
+        is_oiint = (supsub_group.get("base") and
+                   supsub_group["base"].get("type") == "op" and
+                   supsub_group["base"].get("name") and
+                   supsub_group["base"]["name"] in ("\\oiint", "\\oiiint"))
         if isinstance(base, SymbolNode) or is_oiint:
             margin_left = make_em(-base.italic)
 
@@ -166,38 +168,39 @@ def html_builder(group: ParseNode, options: Options):
                     options)
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for superscript/subscript group."""
     from .. import build_mathml as mml
 
+    supsub_group = cast("SupsubParseNode", group)
     # Check for horizontal brace
     is_brace = False
     is_over = None
     is_sup = None
 
-    if group.get("base") and group["base"].get("type") == "horizBrace":
-        is_sup = bool(group.get("sup"))
-        if is_sup == group["base"].get("isOver"):
+    if supsub_group.get("base") and supsub_group["base"].get("type") == "horizBrace":
+        is_sup = bool(supsub_group.get("sup"))
+        if is_sup == supsub_group["base"].get("isOver"):
             is_brace = True
-            is_over = group["base"]["isOver"]
+            is_over = supsub_group["base"]["isOver"]
 
     # Mark parent relationship
-    if group.get("base") and group["base"].get("type") in ("op", "operatorname"):
-        group["base"]["parentIsSupSub"] = True
+    if supsub_group.get("base") and supsub_group["base"].get("type") in ("op", "operatorname"):
+        supsub_group["base"]["parentIsSupSub"] = True
 
-    children = [mml.build_group(group["base"], options)]
+    children = [mml.build_group(supsub_group["base"], options)]
 
-    if group.get("sub"):
-        children.append(mml.build_group(group["sub"], options))
+    if supsub_group.get("sub"):
+        children.append(mml.build_group(supsub_group["sub"], options))
 
-    if group.get("sup"):
-        children.append(mml.build_group(group["sup"], options))
+    if supsub_group.get("sup"):
+        children.append(mml.build_group(supsub_group["sup"], options))
 
     # Determine MathML node type
     if is_brace:
         node_type = "mover" if is_over else "munder"
-    elif not group.get("sub"):
-        base = group.get("base")
+    elif not supsub_group.get("sub"):
+        base = supsub_group.get("base")
         if (base and base.get("type") == "op" and base.get("limits") and
             (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
             node_type = "mover"
@@ -207,8 +210,8 @@ def mathml_builder(group: ParseNode, options: Options) -> MathNode:
             node_type = "mover"
         else:
             node_type = "msup"
-    elif not group.get("sup"):
-        base = group.get("base")
+    elif not supsub_group.get("sup"):
+        base = supsub_group.get("base")
         if (base and base.get("type") == "op" and base.get("limits") and
             (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
             node_type = "munder"
@@ -219,7 +222,7 @@ def mathml_builder(group: ParseNode, options: Options) -> MathNode:
         else:
             node_type = "msub"
     else:
-        base = group.get("base")
+        base = supsub_group.get("base")
         if (base and base.get("type") == "op" and base.get("limits") and
             options.style == Style.DISPLAY):
             node_type = "munderover"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, cast
 
 from ..define_function import define_function
 from ..mathml_tree import MathNode
@@ -10,7 +10,7 @@ from ..style import Style
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, StylingParseNode
 
 # Import sizingGroup from sizing
 try:
@@ -55,7 +55,7 @@ define_function({
 })
 
 
-def _styling_handler(context, args) -> ParseNode:
+def _styling_handler(context: Dict[str, Any], args: Any) -> Dict[str, Any]:
     """Handler for style changing commands."""
     # Parse out the implicit body
     body = context["parser"].parse_expression(True, context.get("breakOnTokenText"))
@@ -72,25 +72,27 @@ def _styling_handler(context, args) -> ParseNode:
     }
 
 
-def _styling_html_builder(group: ParseNode, options: Options):
+def _styling_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for style changes."""
-    new_style = STYLE_MAP[group["style"]]
+    styling_group = cast("StylingParseNode", group)
+    new_style = STYLE_MAP[styling_group["style"]]
     new_options = options.having_style(new_style).with_font('')
-    return sizing_group(group["body"], new_options, options)
+    return sizing_group(styling_group["body"], new_options, options)
 
 
-def _styling_mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def _styling_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for style changes."""
     from .. import build_mathml as mml
 
-    new_style = STYLE_MAP[group["style"]]
+    styling_group = cast("StylingParseNode", group)
+    new_style = STYLE_MAP[styling_group["style"]]
     new_options = options.having_style(new_style)
 
-    inner = mml.build_expression(group["body"], new_options)
+    inner = mml.build_expression(styling_group["body"], new_options)
 
     node = MathNode("mstyle", inner)
 
-    attr = STYLE_ATTRIBUTES[group["style"]]
+    attr = STYLE_ATTRIBUTES[styling_group["style"]]
     node.set_attribute("scriptlevel", attr[0])
     node.set_attribute("displaystyle", attr[1])
 

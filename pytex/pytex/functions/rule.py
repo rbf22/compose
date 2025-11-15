@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from ..build_common import make_span
 from ..define_function import define_function
@@ -12,18 +12,19 @@ from ..units import calculate_size, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode
+    from ..parse_node import ParseNode, RuleParseNode
 
 
-def html_builder(group: ParseNode, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for rule commands."""
+    rule_group = cast("RuleParseNode", group)
     # Create an empty span for the rule
     rule = make_span(["mord", "rule"], [], options)
 
     # Calculate dimensions
-    width = calculate_size(group["width"], options)
-    height = calculate_size(group["height"], options)
-    shift = calculate_size(group.get("shift"), options) if group.get("shift") else 0
+    width = calculate_size(rule_group["width"], options)
+    height = calculate_size(rule_group["height"], options)
+    shift = calculate_size(rule_group.get("shift"), options) if rule_group.get("shift") else 0
 
     # Style the rule
     rule.style["borderRightWidth"] = make_em(width)
@@ -41,18 +42,15 @@ def html_builder(group: ParseNode, options: Options):
     return rule
 
 
-def mathml_builder(group: ParseNode, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for rule commands."""
-    width = calculate_size(group["width"], options)
-    height = calculate_size(group["height"], options)
-    shift = calculate_size(group.get("shift"), options) if group.get("shift") else 0
+    rule_group = cast("RuleParseNode", group)
+    width = calculate_size(rule_group["width"], options)
+    height = calculate_size(rule_group["height"], options)
+    shift = calculate_size(rule_group.get("shift"), options) if rule_group.get("shift") else 0
 
-    # Get color (default to black if not specified)
-    color = getattr(options, 'color', None)
-    if color and hasattr(options, 'get_color'):
-        color = options.get_color()
-    else:
-        color = "black"
+    # Get color using the proper method
+    color = options.get_color() or "black"
 
     # Create the rule as an mspace with background
     rule = MathNode("mspace")
@@ -85,14 +83,19 @@ define_function({
         "allowedInMath": True,
         "argTypes": ["size", "size", "size"],
     },
-    "handler": lambda context, args, opt_args: {
+    "handler": _rule_handler,
+    "html_builder": html_builder,
+    "mathml_builder": mathml_builder,
+})
+
+
+def _rule_handler(context, args, opt_args):
+    """Handler for \\rule command."""
+    return {
         "type": "rule",
         "mode": context["parser"].mode,
         "shift": (assert_node_type(opt_args[0], "size")["value"]
                  if opt_args and opt_args[0] else None),
         "width": assert_node_type(args[0], "size")["value"],
         "height": assert_node_type(args[1], "size")["value"],
-    },
-    "html_builder": html_builder,
-    "mathml_builder": mathml_builder,
-})
+    }

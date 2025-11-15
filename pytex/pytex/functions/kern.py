@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, cast
 
 from ..build_common import make_glue
 from ..define_function import define_function
@@ -11,7 +11,8 @@ from ..parse_node import assert_node_type
 from ..units import calculate_size
 
 if TYPE_CHECKING:
-    from ..parse_node import ParseNode
+    from ..options import Options
+    from ..parse_node import KernParseNode, ParseNode
 
 
 # Define kern/spacing commands
@@ -25,12 +26,12 @@ define_function({
         "allowedInText": True,
     },
     "handler": lambda context, args: _kern_handler(context, args),
-    "html_builder": lambda group, options: make_glue(group["dimension"], options),
-    "mathml_builder": lambda group, options: SpaceNode(calculate_size(group["dimension"], options)),
+    "html_builder": lambda group, options: make_glue(cast("KernParseNode", group)["dimension"], options),
+    "mathml_builder": lambda group, options: SpaceNode(calculate_size(cast("KernParseNode", group)["dimension"], options)),
 })
 
 
-def _kern_handler(context, args) -> ParseNode:
+def _kern_handler(context: Dict[str, Any], args: list) -> Dict[str, Any]:
     """Handler for kern/spacing commands."""
     size = assert_node_type(args[0], "size")
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, cast
 
 from ..build_common import make_fragment
 from ..define_function import define_function
@@ -11,14 +11,14 @@ from ..units import make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import AnyParseNode
+    from ..parse_node import AnyParseNode, ParseNode, SizingParseNode
     from ..dom_tree import HtmlDomNode
 
 
 def sizing_group(
-    value: list[AnyParseNode],
-    options: Options,
-    base_options: Options,
+    value: List[AnyParseNode],
+    options: "Options",
+    base_options: "Options",
 ) -> HtmlDomNode:
     """Create a sizing group with proper scaling."""
     from .. import build_html as html
@@ -52,18 +52,20 @@ SIZE_FUNCS = [
     "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge",
 ]
 
-def html_builder(group, options: Options):
+def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for sizing commands."""
-    new_options = options.having_size(group["size"])
-    return sizing_group(group["body"], new_options, options)
+    sizing_group_node = cast("SizingParseNode", group)
+    new_options = options.having_size(sizing_group_node["size"])
+    return sizing_group(sizing_group_node["body"], new_options, options)
 
 
-def mathml_builder(group, options: Options) -> MathNode:
+def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for sizing commands."""
     from .. import build_mathml as mml
 
-    new_options = options.having_size(group["size"])
-    inner = mml.build_expression(group["body"], new_options)
+    sizing_group_node = cast("SizingParseNode", group)
+    new_options = options.having_size(sizing_group_node["size"])
+    inner = mml.build_expression(sizing_group_node["body"], new_options)
 
     node = MathNode("mstyle", inner)
     # Set mathsize attribute
