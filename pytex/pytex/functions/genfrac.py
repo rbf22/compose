@@ -237,10 +237,6 @@ define_function({
     "mathml_builder": mathml_builder,
 })
 
-define_function({
-    "type": "genfrac",
-    "names": ["\\cfrac"],
-    "props": {
 def _genfrac_handler(context, args, continued):
     """Handler for basic fraction commands."""
     parser = context["parser"]

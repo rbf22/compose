@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional, Union, Dict, Any
 
-from ..build_common import make_line_span, make_span, make_v_list
+from ..build_common import make_fragment, make_line_span, make_span, make_v_list
 from ..define_environment import define_environment
 from ..mathml_tree import MathNode
 from ..parse_error import ParseError

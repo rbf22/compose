@@ -77,4 +77,16 @@ def define_macro(name: str, body: MacroDefinition) -> None:
     _macros[name] = body
 
 
-__all__ = ["define_macro", "_macros", "MacroContextInterface", "MacroArg", "MacroExpansion"]
+def defineMacro(name: str, body: MacroDefinition) -> None:
+    """Compatibility wrapper matching the original KaTeX camelCase API."""
+    define_macro(name, body)
+
+
+__all__ = [
+    "define_macro",
+    "defineMacro",
+    "_macros",
+    "MacroContextInterface",
+    "MacroArg",
+    "MacroExpansion",
+]

@@ -96,25 +96,6 @@ def define_function(definition: Dict[str, Any]) -> None:
     defineFunction(definition)
 
 
-def _create_settings(options: Dict[str, Any]) -> Settings:
-    """Create Settings object from options dictionary."""
-    settings = Settings({
-        'displayMode': options.get('display_mode', False),
-        'throwOnError': options.get('throw_on_error', True),
-        'errorColor': options.get('error_color', '#cc0000'),
-        'macros': options.get('macros', {}),
-        'colorIsTextColor': options.get('color_is_text_color', False),
-        'strict': options.get('strict', False),
-        'trust': options.get('trust', False),
-        'maxSize': options.get('max_size', float('inf')),
-        'maxExpand': options.get('max_expand', 1000),
-        'leqno': options.get('leqno', False),
-        'fleqn': options.get('fleqn', False),
-    })
-
-    return settings
-
-
 # Export public API
 __all__ = [
     "render_to_string",

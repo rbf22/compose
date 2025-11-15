@@ -72,6 +72,16 @@ class Span(DomNode):
         return "".join(markup)
 
 
+# Compatibility alias matching KaTeX's DomSpan class name
+DomSpan = Span
+
+
+@dataclass
+class SvgSpan(Span):
+    """Compatibility subclass used by KaTeX for SVG spans."""
+    pass
+
+
 @dataclass
 class Anchor(DomNode):
     children: List[DomNode] = field(default_factory=list)
@@ -174,6 +184,8 @@ def assert_span(node: DomNode) -> Span:
 __all__ = [
     "DomNode",
     "Span",
+    "DomSpan",
+    "SvgSpan",
     "Anchor",
     "Img",
     "SymbolNode",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, TypedDict
 
 from .parse_error import ParseError
 
@@ -23,6 +23,11 @@ PT_PER_UNIT: Dict[str, float] = {
 }
 
 RELATIVE_UNITS = {"ex", "em", "mu"}
+
+
+class Measurement(TypedDict):
+    number: float
+    unit: str
 
 
 def valid_unit(unit: str) -> bool:
@@ -55,3 +60,13 @@ def calculate_size(size_value: Dict[str, float], options) -> float:
 
 def make_em(value: float) -> str:
     return f"{value:.4f}em"
+
+
+__all__ = [
+    "PT_PER_UNIT",
+    "RELATIVE_UNITS",
+    "Measurement",
+    "valid_unit",
+    "calculate_size",
+    "make_em",
+]

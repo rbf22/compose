@@ -5,7 +5,17 @@ from __future__ import annotations
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
-from .dom_tree import Anchor, DomNode, DomSpan, Span, SvgSpan, SymbolNode, create_class
+from .dom_tree import (
+    Anchor,
+    DomNode,
+    DomSpan,
+    PathNode,
+    Span,
+    SvgNode,
+    SvgSpan,
+    SymbolNode,
+    create_class,
+)
 from .font_metrics import get_character_metrics
 from .options import Options
 from .tree import DocumentFragment
@@ -436,15 +446,26 @@ SVG_DATA: Dict[str, Tuple[str, float, float]] = {
 }
 
 
-def make_fragment(children: List[HtmlDomNode]) -> DocumentFragment:
-    """Create a document fragment from a list of children."""
-    fragment = DocumentFragment(children)
-    # Calculate height and depth from children
-    if children:
-        fragment.height = max((getattr(child, 'height', 0) for child in children), default=0)
-        fragment.depth = max((getattr(child, 'depth', 0) for child in children), default=0)
-        fragment.max_font_size = max((getattr(child, 'max_font_size', 0) for child in children), default=0)
-    return fragment
+def static_svg(value: str, options: Options) -> SvgSpan:
+    """Render a predefined inline SVG (e.g., vector arrows) as a span."""
+    try:
+        path_name, width, height = SVG_DATA[value]
+    except KeyError as exc:  # pragma: no cover - developer error
+        raise ValueError(f"Unknown static SVG '{value}'") from exc
+
+    path = PathNode(path_data=path_name)
+    svg_node = SvgNode(children=[path])
+    svg_node.set_attribute("width", make_em(width))
+    svg_node.set_attribute("height", make_em(height))
+    svg_node.set_attribute("style", f"width:{make_em(width)}")
+    svg_node.set_attribute("viewBox", f"0 0 {int(1000 * width)} {int(1000 * height)}")
+    svg_node.set_attribute("preserveAspectRatio", "xMinYMin")
+
+    span = make_svg_span(["overlay"], [svg_node], options)
+    span.height = height
+    span.style["height"] = make_em(height)
+    span.style["width"] = make_em(width)
+    return span
 
 
 __all__ = [

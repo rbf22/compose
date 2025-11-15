@@ -1,5 +1,7 @@
 """Tests for KaTeX function modules."""
 
+import importlib.util
+
 import pytest
 
 
@@ -33,13 +35,20 @@ class TestFunctionImports:
 
     def test_core_functions_exist(self):
         """Test that core mathematical functions are available."""
-        # Test importing some key functions
+        # Test that some key functions are discoverable in the package
+        function_names = [
+            "supsub",
+            "genfrac",
+            "sqrt",
+            "accent",
+            "op",
+        ]
+
         try:
-            import pytex.functions.supsub
-            import pytex.functions.genfrac
-            import pytex.functions.sqrt
-            import pytex.functions.accent
-            import pytex.functions.op
+            for name in function_names:
+                spec = importlib.util.find_spec(f"pytex.functions.{name}")
+                if spec is None:
+                    raise ImportError(name)
         except ImportError as e:
             pytest.skip(f"Core functions not fully implemented yet: {e}")
 

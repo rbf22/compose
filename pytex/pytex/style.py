@@ -47,6 +47,12 @@ STYLES = (
     Style(SSC, 3, True),
 )
 
+# Provide KaTeX-style constants for convenient access
+Style.DISPLAY = STYLES[D]
+Style.TEXT = STYLES[T]
+Style.SCRIPT = STYLES[S]
+Style.SCRIPTSCRIPT = STYLES[SS]
+
 _SUP = (S, SC, S, SC, SS, SSC, SS, SSC)
 _SUB = (SC, SC, SC, SC, SSC, SSC, SSC, SSC)
 _FRAC_NUM = (T, TC, S, SC, SS, SSC, SS, SSC)

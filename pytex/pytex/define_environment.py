@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .define_function import HTML_GROUP_BUILDERS, MATHML_GROUP_BUILDERS, HtmlBuilder, MathMLBuilder
 
@@ -37,7 +37,33 @@ class EnvSpec:
 ENVIRONMENTS: Dict[str, EnvSpec] = {}
 
 
-def define_environment(spec: EnvDefSpec) -> None:
+def _coerce_props(props: Dict[str, Any]) -> EnvProps:
+    return EnvProps(
+        num_args=props.get("numArgs", 0),
+        allowed_in_text=bool(props.get("allowedInText", False)),
+        num_optional_args=props.get("numOptionalArgs", 0),
+    )
+
+
+def _coerce_env_spec(spec: Union[EnvDefSpec, Dict[str, Any]]) -> EnvDefSpec:
+    if isinstance(spec, EnvDefSpec):
+        return spec
+    if not isinstance(spec, dict):
+        raise TypeError("Environment definition must be EnvDefSpec or dict")
+
+    props = _coerce_props(spec.get("props", {}))
+    return EnvDefSpec(
+        type=spec.get("type", ""),
+        names=list(spec.get("names", [])),
+        props=props,
+        handler=spec.get("handler"),
+        html_builder=spec.get("html_builder"),
+        mathml_builder=spec.get("mathml_builder"),
+    )
+
+
+def define_environment(spec: Union[EnvDefSpec, Dict[str, Any]]) -> None:
+    spec = _coerce_env_spec(spec)
     data = EnvSpec(
         type=spec.type,
         num_args=spec.props.num_args,
@@ -55,4 +81,8 @@ def define_environment(spec: EnvDefSpec) -> None:
         MATHML_GROUP_BUILDERS[spec.type] = spec.mathml_builder
 
 
-__all__ = ["define_environment", "ENVIRONMENTS"]
+__all__ = [
+    "define_environment",
+    "_coerce_env_spec",
+    "ENVIRONMENTS",
+]

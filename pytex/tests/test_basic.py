@@ -1,7 +1,6 @@
 """Comprehensive tests for KaTeX Python implementation."""
 
 import pytest
-from unittest.mock import MagicMock
 
 
 class TestKaTeXImport:

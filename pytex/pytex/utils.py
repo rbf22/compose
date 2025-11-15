@@ -24,6 +24,12 @@ def default(value: Optional[Any], fallback: Any) -> Any:
     return fallback if value is None else value
 
 
+def deflt(value: Optional[Any], fallback: Any) -> Any:
+    """Compatibility wrapper matching KaTeX's `deflt` helper."""
+
+    return default(value, fallback)
+
+
 _UPPERCASE = re.compile(r"([A-Z])")
 
 
@@ -121,6 +127,7 @@ def protocol_from_url(url: str) -> Optional[str]:
 
 __all__ = [
     "default",
+    "deflt",
     "hyphenate",
     "escape",
     "get_base_elem",

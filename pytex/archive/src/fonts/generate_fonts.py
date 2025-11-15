@@ -2,10 +2,8 @@
 
 import sys
 import os
-import json
 
 from fontTools.ttLib import TTFont, sfnt
-from fontTools.misc.timeTools import timestampNow
 sfnt.USE_ZOPFLI = True
 
 if len(sys.argv) < 2:

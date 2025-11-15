@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, List, Optional, Protocol, Union
 
 from .types import ArgType
 
@@ -57,8 +57,44 @@ FUNCTIONS: Dict[str, FunctionSpec] = {}
 HTML_GROUP_BUILDERS: Dict[str, HtmlBuilder] = {}
 MATHML_GROUP_BUILDERS: Dict[str, MathMLBuilder] = {}
 
+# Compatibility aliases matching the original KaTeX module layout
+_functions = FUNCTIONS
+_htmlGroupBuilders = HTML_GROUP_BUILDERS
+_mathmlGroupBuilders = MATHML_GROUP_BUILDERS
 
-def define_function(spec: FunctionDefSpec) -> None:
+
+def _coerce_props(props: Dict[str, Any]) -> FunctionPropSpec:
+    return FunctionPropSpec(
+        num_args=props.get("numArgs", 0),
+        arg_types=props.get("argTypes"),
+        allowed_in_argument=bool(props.get("allowedInArgument", False)),
+        allowed_in_text=bool(props.get("allowedInText", False)),
+        allowed_in_math=props.get("allowedInMath", True),
+        num_optional_args=props.get("numOptionalArgs", 0),
+        infix=bool(props.get("infix", False)),
+        primitive=bool(props.get("primitive", False)),
+    )
+
+
+def _coerce_function_def(spec: Union[FunctionDefSpec, Dict[str, Any]]) -> FunctionDefSpec:
+    if isinstance(spec, FunctionDefSpec):
+        return spec
+    if not isinstance(spec, dict):
+        raise TypeError("Function definition must be FunctionDefSpec or dict")
+
+    props = _coerce_props(spec.get("props", {}))
+    return FunctionDefSpec(
+        type=spec.get("type", ""),
+        names=list(spec.get("names", [])),
+        props=props,
+        handler=spec.get("handler"),
+        html_builder=spec.get("html_builder"),
+        mathml_builder=spec.get("mathml_builder"),
+    )
+
+
+def define_function(spec: Union[FunctionDefSpec, Dict[str, Any]]) -> None:
+    spec = _coerce_function_def(spec)
     data = FunctionSpec(
         type=spec.type,
         num_args=spec.props.num_args,
@@ -82,10 +118,30 @@ def define_function(spec: FunctionDefSpec) -> None:
             MATHML_GROUP_BUILDERS[spec.type] = spec.mathml_builder
 
 
-def define_function_builders(type_: str, html_builder: Optional[HtmlBuilder], mathml_builder: MathMLBuilder) -> None:
+def defineFunction(spec: Union[FunctionDefSpec, Dict[str, Any]]) -> None:
+    """Compatibility wrapper mirroring KaTeX's camelCase API."""
+    define_function(spec)
+
+
+def define_function_builders(
+    type_or_spec: Union[str, Dict[str, Any]],
+    html_builder: Optional[HtmlBuilder] = None,
+    mathml_builder: Optional[MathMLBuilder] = None,
+) -> None:
+    if isinstance(type_or_spec, dict) and html_builder is None and mathml_builder is None:
+        # Legacy KaTeX usage passing a dict
+        spec = type_or_spec
+        type_name = spec.get("type", "")
+        html_builder = spec.get("html_builder")
+        mathml_builder = spec.get("mathml_builder")
+    else:
+        type_name = str(type_or_spec)
+        if mathml_builder is None:
+            raise TypeError("mathml_builder is required")
+
     define_function(
         FunctionDefSpec(
-            type=type_,
+            type=type_name,
             names=[],
             props=FunctionPropSpec(num_args=0),
             handler=lambda *_: (_ for _ in ()).throw(RuntimeError("Should never be called.")),
@@ -109,10 +165,15 @@ def ord_argument(arg: Any) -> List[Any]:
 
 __all__ = [
     "define_function",
+    "defineFunction",
+    "_coerce_function_def",
     "define_function_builders",
     "FUNCTIONS",
     "HTML_GROUP_BUILDERS",
     "MATHML_GROUP_BUILDERS",
+    "_functions",
+    "_htmlGroupBuilders",
+    "_mathmlGroupBuilders",
     "normalize_argument",
     "ord_argument",
 ]

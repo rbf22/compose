@@ -24,7 +24,6 @@ metrics_to_extract = {
         u"\u22ef": None,  # \cdots
         u"\u22f1": None,  # \ddots
         u"\u22ee": None,  # \vdots
-        u"\u22ee": None,  # \vdots
         u"\u22a8": None,  # \models
         u"\u22c8": None,  # \bowtie
         u"\u2250": None,  # \doteq

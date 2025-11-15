@@ -69,7 +69,7 @@ def _environment_handler(context, args) -> ParseNode:
 
         if end["name"] != env_name:
             raise ParseError(
-                f"Mismatch: \\begin{{{env_name}}} matched by \\end{{{end['name']}}}}",
+                f"Mismatch: \\begin{{{env_name}}} matched by \\end{{{end['name']}}}",
                 end_name_token
             )
 
