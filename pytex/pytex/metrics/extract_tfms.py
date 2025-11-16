@@ -2,12 +2,15 @@
 
 import collections
 import json
-import parse_tfm
+from typing import Any, DefaultDict, Dict
+
 import subprocess
 import sys
 
+import parse_tfm  # type: ignore[import-not-found]
 
-def find_font_path(font_name):
+
+def find_font_path(font_name: str) -> bytes:
     try:
         font_path = subprocess.check_output(['kpsewhich', font_name])
     except OSError:
@@ -18,8 +21,8 @@ def find_font_path(font_name):
     return font_path.strip()
 
 
-def main():
-    mapping = json.load(sys.stdin)
+def main() -> None:
+    mapping: Dict[str, Dict[str, Any]] = json.load(sys.stdin)
 
     fonts = [
         'cmbsy10.tfm',
@@ -65,14 +68,14 @@ def main():
         'cmssi10': None,
     }
 
-    font_name_to_tfm = {}
+    font_name_to_tfm: Dict[str, Any] = {}
 
     for font_name in fonts:
         font_basename = font_name.split('.')[0]
         font_path = find_font_path(font_name)
         font_name_to_tfm[font_basename] = parse_tfm.read_tfm_file(font_path)
 
-    families = collections.defaultdict(dict)
+    families: DefaultDict[str, Dict[int, Dict[str, float]]] = collections.defaultdict(dict)
 
     for family, chars in mapping.items():
         for char, char_data in chars.items():

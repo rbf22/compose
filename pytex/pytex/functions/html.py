@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, cast
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..build_common import make_span
 from ..define_function import define_function, ordargument
 from ..parse_error import ParseError
+from ..mathml_tree import MathNode
 from ..parse_node import assert_node_type
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import HtmlParseNode, ParseNode
+    from ..parse_node import HtmlParseNode, ParseNode, RawParseNode
 
 
 # HTML extension commands for adding attributes to math expressions
@@ -29,9 +30,10 @@ define_function({
 })
 
 
-def _html_handler(context: Dict[str, Any], args: list) -> Dict[str, Any]:
+def _html_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
     """Handler for HTML extension commands."""
-    value = assert_node_type(args[0], "raw")["string"]
+    raw_node = cast("RawParseNode", assert_node_type(args[0], "raw"))
+    value = raw_node["string"]
     body = args[1]
     func_name = context["funcName"]
     parser = context["parser"]
@@ -43,8 +45,8 @@ def _html_handler(context: Dict[str, Any], args: list) -> Dict[str, Any]:
             "HTML extension is disabled on strict mode"
         )
 
-    attributes = {}
-    trust_context = None
+    attributes: Dict[str, str] = {}
+    trust_context: Dict[str, Any] | None = None
 
     if func_name == "\\htmlClass":
         attributes["class"] = value
@@ -82,7 +84,7 @@ def _html_handler(context: Dict[str, Any], args: list) -> Dict[str, Any]:
 
     # Security check
     if not parser.settings.is_trusted(trust_context):
-        return parser.format_unsupported_cmd(func_name)
+        return cast(Dict[str, Any], parser.format_unsupported_cmd(func_name))
 
     return {
         "type": "html",
@@ -114,9 +116,10 @@ def _html_html_builder(group: ParseNode, options: "Options") -> Any:
     return span
 
 
-def _html_mathml_builder(group: ParseNode, options: "Options") -> Any:
+def _html_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for HTML extension commands."""
     from .. import build_mathml as mml
 
     html_group = cast("HtmlParseNode", group)
-    return mml.build_expression_row(html_group["body"], options)
+    math = mml.build_expression_row(html_group["body"], options)
+    return math

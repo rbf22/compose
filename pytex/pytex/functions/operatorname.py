@@ -10,6 +10,7 @@ from ..define_macro import define_macro
 from ..dom_tree import DomSpan, Span, SymbolNode
 from ..mathml_tree import MathNode, TextNode
 from ..parse_node import AnyParseNode, ParseNode
+from ..style import Style
 from ..types import Mode
 
 if TYPE_CHECKING:
@@ -143,7 +144,7 @@ except ImportError:
         sup_group: Optional[AnyParseNode],
         sub_group: Optional[AnyParseNode],
         options: "Options",
-        style: Any,
+        style: Style,
         slant: float,
         base_shift: float,
     ) -> Span:

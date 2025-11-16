@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
-from .define_macro import MacroArg, MacroContextInterface, MacroExpansion
+from .define_macro import MacroArg, MacroExpansion
+from .define_function import FUNCTIONS
 from .lexer import Lexer
 from .namespace import Namespace
 from .parse_error import ParseError
@@ -13,16 +14,14 @@ from .source_location import SourceLocation
 from .token import Token
 from .types import Mode
 
-# Placeholder imports
-try:
-    from .functions import functions as FUNCTIONS
-except ImportError:
-    FUNCTIONS = {}
+SymbolTable = Dict[str, Dict[str, Any]]
 
 try:
-    from .symbols_data import symbols as SYMBOLS
+    from .symbols_data import symbols as _SYMBOLS
 except ImportError:
-    SYMBOLS = {}
+    SYMBOLS: SymbolTable = {}
+else:
+    SYMBOLS = cast(SymbolTable, _SYMBOLS)
 
 try:
     from .macros import macros as MACROS
@@ -39,7 +38,7 @@ IMPLICIT_COMMANDS = {
 }
 
 
-class MacroExpander(MacroContextInterface):
+class MacroExpander:
     """Macro expansion engine."""
 
     def __init__(self, input_: str, settings: Settings, mode: Mode):
@@ -98,10 +97,10 @@ class MacroExpander(MacroContextInterface):
                 return None
             start = self.pop_token()  # don't include [ in tokens
             arg_result = self.consume_arg(["]"])
-            tokens, end = arg_result["tokens"], arg_result["end"]
+            tokens, end = arg_result.tokens, arg_result.end
         else:
             arg_result = self.consume_arg()
-            tokens, start, end = arg_result["tokens"], arg_result["start"], arg_result["end"]
+            tokens, start, end = arg_result.tokens, arg_result.start, arg_result.end
 
         # indicate the end of an argument
         self.push_token(Token("EOF", end.loc))
@@ -163,7 +162,7 @@ class MacroExpander(MacroContextInterface):
             tokens = tokens[1:-1]
 
         tokens.reverse()  # to fit in with stack order
-        return {"tokens": tokens, "start": start, "end": tok}
+        return MacroArg(tokens=tokens, start=start, end=tok)
 
     def consume_args(self, num_args: int, delimiters: Optional[List[List[str]]] = None) -> List[List[Token]]:
         """Consume the specified number of (delimited) arguments."""
@@ -178,14 +177,14 @@ class MacroExpander(MacroContextInterface):
 
         args: List[List[Token]] = []
         for i in range(num_args):
-            delim = delimiters[i + 1] if delimiters else None
-            args.append(self.consume_arg(delim)["tokens"])
+            arg_delims: Optional[List[str]] = delimiters[i + 1] if delimiters else None
+            args.append(self.consume_arg(arg_delims).tokens)
         return args
 
     def count_expansion(self, amount: int) -> None:
         """Increment expansionCount by the specified amount."""
         self.expansion_count += amount
-        if self.expansion_count > self.settings.max_expand:
+        if self.expansion_count > self.settings.maxExpand:
             raise ParseError(
                 "Too many expansions: infinite loop or need to increase maxExpand setting"
             )
@@ -204,10 +203,10 @@ class MacroExpander(MacroContextInterface):
             return False
 
         self.count_expansion(1)
-        tokens = expansion["tokens"]
-        args = self.consume_args(expansion["numArgs"], expansion.get("delimiters"))
+        tokens = expansion.tokens
+        args = self.consume_args(expansion.num_args, expansion.delimiters)
 
-        if expansion["numArgs"]:
+        if expansion.num_args:
             # paste arguments in place of the placeholders
             tokens = tokens.copy()
             i = len(tokens) - 1
@@ -302,9 +301,9 @@ class MacroExpander(MacroContextInterface):
                 tokens.append(tok)
                 tok = body_lexer.lex()
             tokens.reverse()  # to fit in with stack using push and pop
-            return {"tokens": tokens, "numArgs": num_args}
+            return MacroExpansion(tokens=tokens, num_args=num_args)
 
-        return expansion
+        return cast(Optional[MacroExpansion], expansion)
 
     def is_defined(self, name: str) -> bool:
         """Determine whether a command is currently 'defined'."""
@@ -321,7 +320,48 @@ class MacroExpander(MacroContextInterface):
             return (isinstance(macro, str) or
                     callable(macro) or
                     not getattr(macro, 'unexpandable', False))
-        return name in FUNCTIONS and not FUNCTIONS[name].get("primitive")
+        func_spec = FUNCTIONS.get(name)
+        return bool(func_spec) and not getattr(func_spec, "primitive", False)
+
+    # ------------------------------------------------------------------
+    # CamelCase adapter methods for MacroContextInterface compatibility
+    # ------------------------------------------------------------------
+
+    def popToken(self) -> Token:
+        return self.pop_token()
+
+    def consumeSpaces(self) -> None:
+        self.consume_spaces()
+
+    def expandOnce(self, expandableOnly: bool = False) -> Union[int, bool]:
+        return self.expand_once(expandableOnly)
+
+    def expandAfterFuture(self) -> Token:
+        return self.expand_after_future()
+
+    def expandNextToken(self) -> Token:
+        return self.expand_next_token()
+
+    def expandMacro(self, name: str) -> Optional[List[Token]]:
+        return self.expand_macro(name)
+
+    def expandMacroAsText(self, name: str) -> Optional[str]:
+        return self.expand_macro_as_text(name)
+
+    def expandTokens(self, tokens: List[Token]) -> List[Token]:
+        return self.expand_tokens(tokens)
+
+    def consumeArg(self, delims: Optional[List[str]] = None) -> MacroArg:
+        return self.consume_arg(delims)
+
+    def consumeArgs(self, numArgs: int) -> List[List[Token]]:
+        return self.consume_args(numArgs)
+
+    def isDefined(self, name: str) -> bool:
+        return self.is_defined(name)
+
+    def isExpandable(self, name: str) -> bool:
+        return self.is_expandable(name)
 
 
 __all__ = ["MacroExpander", "IMPLICIT_COMMANDS"]

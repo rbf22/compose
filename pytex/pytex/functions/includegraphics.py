@@ -54,7 +54,7 @@ define_function({
 
 
 def _includegraphics_handler(context: Dict[str, Any], args: List[Any], opt_args: List[Any]) -> Dict[str, Any]:
-    """Handler for \includegraphics command."""
+    r"""Handler for \includegraphics command."""
     # Default values
     width = {"number": 0, "unit": "em"}
     height = {"number": 0.9, "unit": "em"}  # Character-sized

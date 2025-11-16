@@ -3,7 +3,18 @@
 from __future__ import annotations
 
 import warnings
-from typing import Dict, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    Literal,
+    TypedDict,
+    cast,
+)
 
 from .dom_tree import (
     Anchor,
@@ -20,30 +31,80 @@ from .font_metrics import get_character_metrics
 from .options import Options
 from .tree import DocumentFragment
 from .types import Mode
-from .units import calculate_size, make_em
+from .units import Measurement, calculate_size, make_em
 
-# Placeholder - will be imported from generated data
-try:
-    from .symbols_data import symbols as SYMBOLS, ligatures as LIGATURES
-except ImportError:
-    SYMBOLS = {}
-    LIGATURES = {}
+SymbolTable = Dict[Mode, Dict[str, Dict[str, str]]]
+LigatureTable = Dict[str, bool]
 
 try:
-    from .font_metrics_data import FONT_METRICS_DATA
+    from .symbols_data import symbols as _SYMBOLS, ligatures as _LIGATURES
 except ImportError:
-    FONT_METRICS_DATA = {}
+    SYMBOLS: SymbolTable = {}
+    LIGATURES: LigatureTable = {}
+else:
+    SYMBOLS = cast(SymbolTable, _SYMBOLS)
+    LIGATURES = _LIGATURES
+
+try:
+    from .font_metrics_data import FONT_METRICS_DATA as _FONT_METRICS_DATA
+except ImportError:
+    FONT_METRICS_DATA: Dict[str, Any] = {}
+else:
+    FONT_METRICS_DATA = cast(Dict[str, Any], _FONT_METRICS_DATA)
+
+
+class SymbolMetrics(TypedDict, total=False):
+    height: float
+    depth: float
+    italic: float
+    skew: float
+    width: float
+
+
+class LookupResult(TypedDict):
+    value: str
+    metrics: Optional[SymbolMetrics]
+
+
+DomChild = Union[DomNode, DocumentFragment]
+
+
+class VListChildElem(TypedDict, total=False):
+    type: Literal["elem"]
+    elem: DomNode
+    shift: float
+    marginLeft: str
+    marginRight: str
+    wrapperClasses: List[str]
+    wrapperStyle: Dict[str, str]
+
+
+class VListChildKern(TypedDict):
+    type: Literal["kern"]
+    size: float
+
+
+VListChild = Union[VListChildElem, VListChildKern]
+
+
+class VListParam(TypedDict, total=False):
+    positionType: Literal["individualShift", "top", "bottom", "shift", "firstBaseline"]
+    positionData: float
+    children: List[VListChild]
 
 
 def lookup_symbol(
     value: str, font_name: str, mode: Mode
-) -> Dict[str, Union[str, Optional[Dict[str, float]]]]:
+) -> LookupResult:
     """Look up symbol with replacements."""
     replace = SYMBOLS.get(mode, {}).get(value, {}).get("replace")
     if replace:
         value = replace
     metrics = get_character_metrics(value, font_name, mode)
-    return {"value": value, "metrics": metrics}
+    return {
+        "value": value,
+        "metrics": cast(Optional[SymbolMetrics], metrics),
+    }
 
 
 def make_symbol(
@@ -116,7 +177,7 @@ def boldsymbol(
 
 
 def make_ord(
-    group: Dict[str, any], options: Options, type_: str
+    group: Dict[str, Any], options: Options, type_: str
 ) -> Union[DocumentFragment, SymbolNode]:
     """Create mathord or textord symbol."""
     mode = group["mode"]
@@ -222,7 +283,7 @@ def try_combine_chars(chars: List[DomNode]) -> List[DomNode]:
     return chars
 
 
-def size_element_from_children(elem: DomNode) -> None:
+def size_element_from_children(elem: Union[DomNode, DocumentFragment]) -> None:
     """Calculate height/depth/maxFontSize from children."""
     height = 0.0
     depth = 0.0
@@ -240,24 +301,34 @@ def size_element_from_children(elem: DomNode) -> None:
 
 def make_span(
     classes: Optional[List[str]] = None,
-    children: Optional[List[DomNode]] = None,
+    children: Optional[Sequence[DomNode]] = None,
     options: Optional[Options] = None,
     style: Optional[Dict[str, str]] = None,
 ) -> DomSpan:
     """Create a Span with size calculation."""
-    span = Span(classes=classes or [], children=children or [], options=options, style=style or {})
+    span = Span(
+        classes=classes or [],
+        children=list(children) if children is not None else [],
+        style=style or {},
+    )
     size_element_from_children(span)
     return span
 
 
 def make_svg_span(
     classes: Optional[List[str]] = None,
-    children: Optional[List[DomNode]] = None,
+    children: Optional[Sequence[DomNode]] = None,
     options: Optional[Options] = None,
     style: Optional[Dict[str, str]] = None,
 ) -> SvgSpan:
     """Create SVG Span."""
-    return Span(classes=classes or [], children=children or [], options=options, style=style or {})
+    span = SvgSpan(
+        classes=classes or [],
+        children=list(children) if children is not None else [],
+        style=style or {},
+    )
+    size_element_from_children(span)
+    return span
 
 
 def make_line_span(class_name: str, options: Options, thickness: Optional[float] = None) -> DomSpan:
@@ -273,12 +344,13 @@ def make_anchor(
     href: str, classes: List[str], children: List[DomNode], options: Options
 ) -> Anchor:
     """Create Anchor with size calculation."""
-    anchor = Anchor(href=href, classes=classes, children=children, options=options)
+    anchor = Anchor(classes=classes, children=children)
+    anchor.attributes["href"] = href
     size_element_from_children(anchor)
     return anchor
 
 
-def make_fragment(children: List[DomNode]) -> DocumentFragment:
+def make_fragment(children: Sequence[DomNode]) -> DocumentFragment:
     """Create DocumentFragment with size calculation."""
     fragment = DocumentFragment(children=children)
     size_element_from_children(fragment)
@@ -293,11 +365,9 @@ def wrap_fragment(group: DomNode, options: Options) -> DomNode:
 
 
 # VList types
-VListElem = Dict[str, any]
-VListChild = Union[VListElem, Dict[str, Union[str, float]]]
+VListElem = Dict[str, Any]
 
-
-def get_v_list_children_and_depth(params: Dict[str, any]) -> Tuple[List[VListChild], float]:
+def get_v_list_children_and_depth(params: Dict[str, Any]) -> Tuple[List[VListChild], float]:
     """Calculate VList children and depth."""
     if params["positionType"] == "individualShift":
         old_children = params["children"]
@@ -335,7 +405,7 @@ def get_v_list_children_and_depth(params: Dict[str, any]) -> Tuple[List[VListChi
     return params["children"], depth
 
 
-def make_v_list(params: Dict[str, any], options: Options) -> DomSpan:
+def make_v_list(params: Dict[str, Any], options: Options) -> DomSpan:
     """Create vertical list."""
     children, depth = get_v_list_children_and_depth(params)
 
@@ -394,7 +464,7 @@ def make_v_list(params: Dict[str, any], options: Options) -> DomSpan:
     return vtable
 
 
-def make_glue(measurement: Dict[str, Union[str, float]], options: Options) -> DomSpan:
+def make_glue(measurement: Measurement, options: Options) -> DomSpan:
     """Create glue span."""
     rule = make_span(["mspace"], [], options)
     size = calculate_size(measurement, options)

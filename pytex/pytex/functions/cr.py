@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from ..build_common import make_span
 from ..define_function import define_function
 from ..mathml_tree import MathNode
 from ..parse_node import assert_node_type
-from ..units import calculate_size, make_em
+from ..units import Measurement, calculate_size, make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import CrParseNode, ParseNode
+    from ..parse_node import CrParseNode, ParseNode, SizeParseNode
 
 
 # Line break command (\\)
@@ -30,12 +30,15 @@ define_function({
 })
 
 
-def _cr_handler(context, args, opt_args) -> Any:
+def _cr_handler(context: Dict[str, Any], args: List[Any], opt_args: List[Any]) -> Dict[str, Any]:
     """Handler for line break (\\) command."""
     parser = context["parser"]
 
     # Parse optional size argument [size]
-    size = parser.parse_size_group(True) if parser.gullet.future()["text"] == "[" else None
+    size_node = parser.parse_size_group(True) if parser.gullet.future()["text"] == "[" else None
+    size_value: Optional[Measurement] = None
+    if size_node is not None:
+        size_value = cast("SizeParseNode", assert_node_type(size_node, "size"))["value"]
 
     # Determine if this creates a new line
     new_line = (not parser.settings.display_mode or
@@ -47,7 +50,7 @@ def _cr_handler(context, args, opt_args) -> Any:
         "type": "cr",
         "mode": parser.mode,
         "newLine": new_line,
-        "size": assert_node_type(size, "size")["value"] if size else None,
+        "size": size_value,
     }
 
 
@@ -58,8 +61,9 @@ def _cr_html_builder(group: ParseNode, options: "Options") -> Any:
 
     if cr_group.get("newLine"):
         span.classes.append("newline")
-        if cr_group.get("size"):
-            span.style["marginTop"] = make_em(calculate_size(cr_group["size"], options))
+        size = cr_group.get("size")
+        if size is not None:
+            span.style["marginTop"] = make_em(calculate_size(size, options))
 
     return span
 
@@ -71,7 +75,8 @@ def _cr_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     if cr_group.get("newLine"):
         node.set_attribute("linebreak", "newline")
-        if cr_group.get("size"):
-            node.set_attribute("height", make_em(calculate_size(cr_group["size"], options)))
+        size = cr_group.get("size")
+        if size is not None:
+            node.set_attribute("height", make_em(calculate_size(size, options)))
 
     return node

@@ -8,6 +8,7 @@ from ..build_common import make_span
 from ..define_function import define_function, ordargument
 from ..dom_tree import DomSpan
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 
 if TYPE_CHECKING:
     from ..options import Options
@@ -68,7 +69,7 @@ def _pmb_mathml_builder(group: Mapping[str, Any], options: "Options") -> MathNod
     inner = mml.build_expression(pmb_group["body"], options)
 
     # Wrap with mstyle element
-    node = MathNode("mstyle", inner)
+    node = MathNode("mstyle", cast(List[VirtualNode], inner))
     node.set_attribute("style", "text-shadow: 0.02em 0.01em 0.04px")
 
     return node

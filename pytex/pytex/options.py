@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .font_metrics import get_global_metrics
 from .style import Style, DEFAULT_STYLES

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional
 
-from .tree import DocumentFragment
+from .tree import DocumentFragment, VirtualNode
 from .utils import escape
 from .units import make_em
 
@@ -26,7 +26,7 @@ class TextNode:
 @dataclass
 class MathNode:
     type: str
-    children: Sequence[object] = field(default_factory=list)
+    children: List[VirtualNode] = field(default_factory=list)
     classes: List[str] = field(default_factory=list)
     attributes: Dict[str, str] = field(default_factory=dict)
 

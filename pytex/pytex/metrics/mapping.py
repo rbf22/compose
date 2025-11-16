@@ -38,6 +38,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Sequence, Tuple, Union
+from typing import TypedDict
 
 
 ROOT = Path(__file__).parent
@@ -58,6 +59,13 @@ class Range:
 GlyphSource = Union[int, Range]
 GlyphTarget = Union[int, Tuple[int, int, int]]
 MappingEntry = Tuple[GlyphSource, GlyphTarget]
+
+
+class MappingMetadata(TypedDict):
+    font: str
+    char: int
+    xshift: int
+    yshift: int
 
 
 class MappingParseError(RuntimeError):
@@ -221,7 +229,7 @@ def _family_and_style(font_descriptor: str) -> Tuple[str, str]:
     return family, style
 
 
-def _expand_entries(cmfont: str, entries: Sequence[MappingEntry]) -> Iterator[Tuple[int, Dict[str, int]]]:
+def _expand_entries(cmfont: str, entries: Sequence[MappingEntry]) -> Iterator[Tuple[int, MappingMetadata]]:
     for source, target in entries:
         if isinstance(source, Range):
             sources = list(source.expand())
@@ -245,7 +253,7 @@ def _expand_entries(cmfont: str, entries: Sequence[MappingEntry]) -> Iterator[Tu
             }
 
 
-def _build_mapping(map_data: Dict[str, Dict[str, List[MappingEntry]]]) -> Dict[str, Dict[int, Dict[str, int]]]:
+def _build_mapping(map_data: Dict[str, Dict[str, List[MappingEntry]]]) -> Dict[str, Dict[int, MappingMetadata]]:
     reverse: Dict[str, Dict[str, List[MappingEntry]]] = {}
     for cmfont, font_map in map_data.items():
         for descriptor, entries in font_map.items():
@@ -253,7 +261,7 @@ def _build_mapping(map_data: Dict[str, Dict[str, List[MappingEntry]]]) -> Dict[s
             fontname = f"{family}-{style}"
             reverse.setdefault(fontname, {}).setdefault(cmfont, []).extend(entries)
 
-    output: Dict[str, Dict[int, Dict[str, int]]] = {}
+    output: Dict[str, Dict[int, MappingMetadata]] = {}
     for mjfont, cmfonts in reverse.items():
         font_output = output.setdefault(mjfont, {})
         for cmfont, entries in cmfonts.items():
@@ -269,7 +277,7 @@ def _build_mapping(map_data: Dict[str, Dict[str, List[MappingEntry]]]) -> Dict[s
     return output
 
 
-def load_mapping() -> Dict[str, Dict[int, Dict[str, int]]]:
+def load_mapping() -> Dict[str, Dict[int, MappingMetadata]]:
     content = DATA_FILE.read_text(encoding="utf-8")
     map_data = _parse_map_definitions(content)
     return _build_mapping(map_data)

@@ -1,12 +1,12 @@
 """Integration and edge case tests for KaTeX Python."""
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 
 
 class TestKaTeXIntegration:
     """Integration tests combining multiple features."""
 
-    def test_complex_expression_with_multiple_features(self):
+    def test_complex_expression_with_multiple_features(self) -> None:
         """Test complex expressions that use multiple KaTeX features."""
         import pytex.katex as katex
 
@@ -21,7 +21,7 @@ class TestKaTeXIntegration:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_nested_environments(self):
+    def test_nested_environments(self) -> None:
         """Test expressions with nested mathematical constructs."""
         import pytex.katex as katex
 
@@ -41,7 +41,7 @@ class TestKaTeXIntegration:
 class TestKaTeXEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_empty_expressions(self):
+    def test_empty_expressions(self) -> None:
         """Test handling of empty or minimal expressions."""
         import pytex.katex as katex
 
@@ -51,7 +51,7 @@ class TestKaTeXEdgeCases:
             result = katex.render_to_string(expr)
             assert isinstance(result, str)
 
-    def test_special_characters(self):
+    def test_special_characters(self) -> None:
         """Test handling of special characters."""
         import pytex.katex as katex
 
@@ -68,7 +68,7 @@ class TestKaTeXEdgeCases:
             result = katex.render_to_string(expr)
             assert isinstance(result, str)
 
-    def test_unicode_characters(self):
+    def test_unicode_characters(self) -> None:
         """Test handling of Unicode characters in expressions."""
         import pytex.katex as katex
 
@@ -86,7 +86,7 @@ class TestKaTeXEdgeCases:
 class TestKaTeXPerformance:
     """Basic performance tests."""
 
-    def test_multiple_rendering_calls(self):
+    def test_multiple_rendering_calls(self) -> None:
         """Test that multiple rendering calls work efficiently."""
         import pytex.katex as katex
 
@@ -102,7 +102,7 @@ class TestKaTeXPerformance:
 class TestKaTeXConfiguration:
     """Test configuration and options handling."""
 
-    def test_display_mode_option(self):
+    def test_display_mode_option(self) -> None:
         """Test display mode configuration."""
         import pytex.katex as katex
 
@@ -115,7 +115,7 @@ class TestKaTeXConfiguration:
         assert isinstance(inline, str)
         assert isinstance(display, str)
 
-    def test_options_dict_handling(self):
+    def test_options_dict_handling(self) -> None:
         """Test that options dictionary is handled properly."""
         import pytex.katex as katex
 
@@ -136,7 +136,7 @@ class TestKaTeXConfiguration:
 class TestKaTeXCompatibility:
     """Test compatibility with different LaTeX constructs."""
 
-    def test_amsmath_compatibility(self):
+    def test_amsmath_compatibility(self) -> None:
         """Test compatibility with AMS math constructs."""
         import pytex.katex as katex
 
@@ -151,7 +151,7 @@ class TestKaTeXCompatibility:
             result = katex.render_to_string(expr)
             assert isinstance(result, str)
 
-    def test_color_commands(self):
+    def test_color_commands(self) -> None:
         """Test color command compatibility."""
         import pytex.katex as katex
 

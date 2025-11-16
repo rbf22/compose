@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 from fontTools.ttLib import TTFont
+from typing import Any, Dict, Optional
 import sys
 import json
 
 # map of characters to extract
-metrics_to_extract = {
+FontMetricsMap = Dict[str, Dict[str, Optional[str]]]
+
+metrics_to_extract: FontMetricsMap = {
     # Font name
     "AMS-Regular": {
         u"\u21e2": None,  # \dashrightarrow
@@ -57,8 +60,8 @@ metrics_to_extract = {
 }
 
 
-def main():
-    start_json = json.load(sys.stdin)
+def main() -> None:
+    start_json: Any = json.load(sys.stdin)
 
     for font in start_json:
         fontInfo = TTFont("../../fonts/KaTeX_" + font + ".ttf")
@@ -74,7 +77,11 @@ def main():
                 if (t.platformID == 0)
                 or (t.platformID == 3 and t.platEncID in (1, 10))]
 
-        chars = metrics_to_extract.get(font, {})
+        base_chars = metrics_to_extract.get(font)
+        if base_chars is None:
+            chars: Dict[str, Optional[str]] = {}
+        else:
+            chars = dict(base_chars)
         chars[u"\u0020"] = None  # space
         chars[u"\u00a0"] = None  # nbsp
 

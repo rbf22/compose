@@ -2,23 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Union, Any
+from typing import Any, Dict, List, Mapping, Sequence, TypedDict, Union, cast
 
 from .build_common import make_span, make_svg_span
 from .dom_tree import DomSpan, HtmlDomNode, LineNode, PathNode, SvgNode, SvgSpan
 from .mathml_tree import MathNode, TextNode
+from .options import Options
 from .units import make_em
-
-# Placeholder imports - will be filled in
-try:
-    from .options import Options
-except ImportError:
-    Options = Any  # type: ignore
-
-try:
-    from .parse_node import AnyParseNode
-except ImportError:
-    AnyParseNode = Any  # type: ignore
 
 
 STRETCHY_CODE_POINT: Dict[str, str] = {
@@ -76,8 +66,8 @@ def math_ml_node(label: str) -> MathNode:
 
 
 # KaTeX SVG images data
-# Format: [paths, minWidth, height] or [paths, minWidth, height, align]
-KATEX_IMAGES_DATA: Dict[str, Union[List[Union[List[str], float]], List[Union[List[str], float, str]]]] = {
+# Stored as heterogeneous sequences; concrete access is type-safe via casts below.
+KATEX_IMAGES_DATA: Dict[str, Sequence[object]] = {
     # path(s), minWidth, height, align
     "overrightarrow": [["rightarrow"], 0.888, 522, "xMaxYMin"],
     "overleftarrow": [["leftarrow"], 0.888, 522, "xMinYMin"],
@@ -126,7 +116,7 @@ KATEX_IMAGES_DATA: Dict[str, Union[List[Union[List[str], float]], List[Union[Lis
 }
 
 
-def group_length(arg: AnyParseNode) -> int:
+def group_length(arg: Mapping[str, Any]) -> int:
     """Get the length of a parse node group."""
     if arg.get("type") == "ordgroup":
         return len(arg.get("body", []))
@@ -134,15 +124,27 @@ def group_length(arg: AnyParseNode) -> int:
         return 1
 
 
-def svg_span(group: AnyParseNode, options: Options) -> Union[DomSpan, SvgSpan]:
+class _StretchySvgResult(TypedDict):
+    span: Union[DomSpan, SvgSpan]
+    minWidth: float
+    height: float
+
+
+def svg_span(group: Mapping[str, Any], options: Options) -> Union[DomSpan, SvgSpan]:
     """Create SVG span for stretchy element."""
-    def build_svg_span() -> Dict[str, Union[DomSpan, SvgSpan, float]]:
+
+    def build_svg_span() -> _StretchySvgResult:
         view_box_width = 400000  # default
-        label = group["label"][1:]  # Remove leading backslash
+        raw_label = group.get("label", "")
+        label = raw_label[1:] if isinstance(raw_label, str) and raw_label.startswith("\\") else cast(str, raw_label)
 
         if label in ["widehat", "widecheck", "widetilde", "utilde"]:
             # Accent-type stretchy elements
-            num_chars = group_length(group["base"])
+            base_node = group.get("base")
+            if isinstance(base_node, Mapping):
+                num_chars = group_length(base_node)
+            else:
+                num_chars = 1
             view_box_height: float
             path_name: str
             height: float
@@ -177,13 +179,12 @@ def svg_span(group: AnyParseNode, options: Options) -> Union[DomSpan, SvgSpan]:
                     height = height_vals[img_index]
                     path_name = "tilde" + str(img_index)
 
-            path = PathNode(path_name)
-            svg_node = SvgNode([path], {
-                "width": "100%",
-                "height": make_em(height),
-                "viewBox": f"0 0 {view_box_width} {view_box_height}",
-                "preserveAspectRatio": "none",
-            })
+            path = PathNode(path_data=path_name)
+            svg_node = SvgNode(children=[path])
+            svg_node.set_attribute("width", "100%")
+            svg_node.set_attribute("height", make_em(height))
+            svg_node.set_attribute("viewBox", f"0 0 {view_box_width} {view_box_height}")
+            svg_node.set_attribute("preserveAspectRatio", "none")
             return {
                 "span": make_svg_span([], [svg_node], options),
                 "minWidth": 0,
@@ -193,16 +194,16 @@ def svg_span(group: AnyParseNode, options: Options) -> Union[DomSpan, SvgSpan]:
             # Regular stretchy elements
             spans: List[SvgSpan] = []
             data = KATEX_IMAGES_DATA[label]
-            paths = data[0]
-            min_width = data[1]
-            view_box_height = data[2]
+            paths = cast(List[str], data[0])
+            min_width = float(cast(float, data[1]))
+            view_box_height = float(cast(float, data[2]))
 
             height = view_box_height / 1000
             num_svg_children = len(paths)
 
             if num_svg_children == 1:
                 # Single path with alignment
-                align = data[3] if len(data) > 3 else "xMinYMin"
+                align = cast(str, data[3]) if len(data) > 3 else "xMinYMin"
                 width_classes = ["hide-tail"]
                 aligns = [align]
             elif num_svg_children == 2:
@@ -218,13 +219,12 @@ def svg_span(group: AnyParseNode, options: Options) -> Union[DomSpan, SvgSpan]:
                 )
 
             for i in range(num_svg_children):
-                path = PathNode(paths[i])
-                svg_node = SvgNode([path], {
-                    "width": "400em",
-                    "height": make_em(height),
-                    "viewBox": f"0 0 {view_box_width} {view_box_height}",
-                    "preserveAspectRatio": f"{aligns[i]} slice",
-                })
+                path = PathNode(path_data=paths[i])
+                svg_node = SvgNode(children=[path])
+                svg_node.set_attribute("width", "400em")
+                svg_node.set_attribute("height", make_em(height))
+                svg_node.set_attribute("viewBox", f"0 0 {view_box_width} {view_box_height}")
+                svg_node.set_attribute("preserveAspectRatio", f"{aligns[i]} slice")
 
                 span = make_svg_span([width_classes[i]], [svg_node], options)
                 if num_svg_children == 1:
@@ -273,30 +273,33 @@ def enclose_span(
                 img.style["borderColor"] = color
     else:
         # \cancel, \bcancel, or \xcancel
-        lines = []
+        lines: List[HtmlDomNode] = []
 
         if "bcancel" in label or "xcancel" in label:
-            lines.append(LineNode({
+            line = LineNode()
+            line.attributes.update({
                 "x1": "0",
                 "y1": "0",
                 "x2": "100%",
                 "y2": "100%",
                 "stroke-width": "0.046em",
-            }))
+            })
+            lines.append(line)
 
         if "xcancel" in label:
-            lines.append(LineNode({
+            line = LineNode()
+            line.attributes.update({
                 "x1": "0",
                 "y1": "100%",
                 "x2": "100%",
                 "y2": "0",
                 "stroke-width": "0.046em",
-            }))
+            })
+            lines.append(line)
 
-        svg_node = SvgNode(lines, {
-            "width": "100%",
-            "height": make_em(total_height),
-        })
+        svg_node = SvgNode(children=lines)
+        svg_node.set_attribute("width", "100%")
+        svg_node.set_attribute("height", make_em(total_height))
 
         img = make_svg_span([], [svg_node], options)
 

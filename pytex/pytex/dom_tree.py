@@ -26,11 +26,16 @@ class DomNode:
     attributes: Dict[str, str] = field(default_factory=dict)
     height: float = 0.0
     depth: float = 0.0
+    width: float = 0.0
     max_font_size: float = 0.0
 
     def add_class(self, class_name: str) -> None:
         if class_name not in self.classes:
             self.classes.append(class_name)
+
+    def has_class(self, class_name: str) -> bool:
+        """Return True if the node has the given CSS class."""
+        return class_name in self.classes
 
     def set_attribute(self, key: str, value: str) -> None:
         if INVALID_ATTRIBUTE_NAME.search(key):
@@ -74,6 +79,9 @@ class Span(DomNode):
 
 # Compatibility alias matching KaTeX's DomSpan class name
 DomSpan = Span
+
+# Type alias used throughout HTML builders
+HtmlDomNode = DomNode
 
 
 @dataclass
@@ -183,6 +191,7 @@ def assert_span(node: DomNode) -> Span:
 
 __all__ = [
     "DomNode",
+    "HtmlDomNode",
     "Span",
     "DomSpan",
     "SvgSpan",

@@ -7,19 +7,20 @@ from typing import TYPE_CHECKING, Any, List, cast
 from ..build_common import make_fragment
 from ..define_function import define_function
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 from ..units import make_em
 
 if TYPE_CHECKING:
     from ..options import Options
     from ..parse_node import AnyParseNode, ParseNode, SizingParseNode
-    from ..dom_tree import HtmlDomNode
+    from ..tree import DocumentFragment
 
 
 def sizing_group(
     value: List[AnyParseNode],
     options: "Options",
     base_options: "Options",
-) -> HtmlDomNode:
+) -> DocumentFragment:
     """Create a sizing group with proper scaling."""
     from .. import build_html as html
 
@@ -67,7 +68,7 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     new_options = options.having_size(sizing_group_node["size"])
     inner = mml.build_expression(sizing_group_node["body"], new_options)
 
-    node = MathNode("mstyle", inner)
+    node = MathNode("mstyle", cast(List[VirtualNode], inner))
     # Set mathsize attribute
     node.set_attribute("mathsize", make_em(new_options.size_multiplier))
 

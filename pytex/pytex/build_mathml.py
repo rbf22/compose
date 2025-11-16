@@ -2,31 +2,38 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, cast
 
 from .build_common import make_span
 from .font_metrics import get_character_metrics
 from .mathml_tree import MathNode, TextNode
 from .parse_error import ParseError
-from .types import FontVariant
+from .tree import VirtualNode
+from .types import FontVariant, Mode
 
-# Placeholder imports
+SymbolTable = Dict[Mode, Dict[str, Dict[str, str]]]
+LigatureTable = Dict[str, bool]
+
 try:
-    from .symbols_data import symbols as SYMBOLS, ligatures as LIGATURES
+    from .symbols_data import symbols as _SYMBOLS, ligatures as _LIGATURES
 except ImportError:
-    SYMBOLS = {}
-    LIGATURES = {}
+    SYMBOLS: SymbolTable = {}
+    LIGATURES: LigatureTable = {}
+else:
+    SYMBOLS = cast(SymbolTable, _SYMBOLS)
+    LIGATURES = _LIGATURES
 
 try:
-    from .define_function import _mathml_group_builders as group_builders
+    from .define_function import _mathmlGroupBuilders as group_builders
 except ImportError:
     group_builders = {}
 
 if TYPE_CHECKING:
     from .options import Options
     from .parse_node import AnyParseNode, SymbolParseNode
-    from .types import Mode
     from .dom_tree import DomSpan, DomNode
+
+    GroupBuilder = Callable[[AnyParseNode, Options], MathNode]
 
 def make_text(text: str, mode: Mode, options: Optional[Options] = None) -> TextNode:
     """Create a MathML text node with optional symbol replacement."""
@@ -47,7 +54,7 @@ def make_row(body: List[MathNode]) -> MathNode:
     if len(body) == 1:
         return body[0]
     else:
-        return MathNode("mrow", body)
+        return MathNode("mrow", cast(List[VirtualNode], body))
 
 
 def get_variant(group: SymbolParseNode, options: Options) -> Optional[FontVariant]:
@@ -105,7 +112,8 @@ def get_variant(group: SymbolParseNode, options: Options) -> Optional[FontVarian
     # Check if we can use this font variant
     from .build_common import FONT_MAP
     if font in FONT_MAP and get_character_metrics(text, FONT_MAP[font]["fontName"], mode):
-        return FONT_MAP[font]["variant"]
+        # FONT_MAP stores variant names as strings; convert to FontVariant enum.
+        return FontVariant(FONT_MAP[font]["variant"])
 
     return None
 
@@ -142,8 +150,8 @@ def build_expression(
             group.set_attribute("rspace", "0em")
         return [group]
 
-    groups = []
-    last_group = None
+    groups: List[MathNode] = []
+    last_group: Optional[MathNode] = None
 
     for i, expr in enumerate(expression):
         group = build_group(expr, options)
@@ -206,8 +214,16 @@ def build_group(group: Optional[AnyParseNode], options: Options) -> MathNode:
 
     if group["type"] in group_builders:
         # Call the group builder function
-        result = group_builders[group["type"]](group, options)
-        return cast(MathNode, result)  # type: ignore[return-value]
+        builder = group_builders[group["type"]]
+        if TYPE_CHECKING:
+            # Help mypy understand the builder signature
+            builder_typed: "GroupBuilder" = builder
+            result = builder_typed(group, options)
+        else:
+            result = builder(group, options)
+        if isinstance(result, MathNode):
+            return result
+        raise TypeError("Expected MathNode from mathml group builder")
     else:
         raise ParseError(f"Got group of unknown type: '{group['type']}'")
 
@@ -227,7 +243,7 @@ def build_mathml(
         expression[0].type in ["mrow", "mtable"]):
         wrapper = expression[0]
     else:
-        wrapper = MathNode("mrow", expression)
+        wrapper = MathNode("mrow", cast(List[VirtualNode], expression))
 
     # Build TeX annotation
     annotation = MathNode("annotation", [TextNode(tex_expression)])

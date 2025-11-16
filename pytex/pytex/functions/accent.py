@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from ..build_common import make_ord, make_span, make_v_list, static_svg
 from ..define_function import define_function, normalize_argument
@@ -12,8 +12,9 @@ from ..utils import is_character_box, get_base_elem
 from ..units import make_em
 
 if TYPE_CHECKING:
+    from ..dom_tree import DomNode, SymbolNode
     from ..options import Options
-    from ..parse_node import AccentParseNode, ParseNode
+    from ..parse_node import AccentParseNode, AnyParseNode, ParseNode
 
 
 def is_accent_node(node: Any) -> bool:
@@ -30,42 +31,46 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
 
     # Handle the supsub case where accent is nested
     supsub_group = None
+    accent_dict: Dict[str, Any]
+    base_node_opt: Optional[AnyParseNode] = None
 
-    if (isinstance(group, dict) and group.get("type") == "supsub" and
-        isinstance(group.get("base"), dict) and is_accent_node(group["base"])):
-        # Extract the accent from the supsub
-        accent_group = group["base"]
-        base = accent_group["base"]
+    group_dict = cast(Dict[str, Any], group)
 
-        # Build the supsub with accent temporarily removed
-        temp_group = {**group, "base": base}
+    if (isinstance(group, dict) and group_dict.get("type") == "supsub" and
+        isinstance(group_dict.get("base"), dict) and is_accent_node(group_dict["base"])):
+        accent_dict = group_dict["base"]
+        base_node_opt = cast("AnyParseNode", accent_dict.get("base"))
+        temp_group = cast("ParseNode", {**group_dict, "base": base_node_opt})
         supsub_group = html.build_group(temp_group, options)
-    elif is_accent_node(group):
-        # Normal accent case
-        accent_group = group
-        base = accent_group["base"]
+    elif is_accent_node(group_dict):
+        accent_dict = group_dict
+        base_node_opt = cast("AnyParseNode", accent_dict.get("base"))
     else:
-        # Fallback - shouldn't happen in normal operation
-        accent_group = cast(Any, group)
-        base = accent_group.get("base")
+        accent_dict = group_dict
+        base_node_opt = cast(Optional[AnyParseNode], accent_dict.get("base"))
 
-    # Build the base group with cramped style
-    body = html.build_group(base, options.having_cramped_style())
+    if base_node_opt is None:
+        raise ValueError("Accent group missing base parse node")
+
+    base_node = base_node_opt
+    accent_group = cast("AccentParseNode", accent_dict)
+    body = html.build_group(base_node, options.having_cramped_style())
 
     # Check if accent needs to shift for character skew
-    must_shift = (isinstance(accent_group, dict) and
-                  accent_group.get("isShifty", False) and
-                  is_character_box(base))
+    must_shift = bool(
+        accent_group.get("isShifty", False) and
+        is_character_box(cast(Dict[str, Any], base_node))
+    )
 
     # Calculate skew
-    skew = 0
+    skew: float = 0.0
     if must_shift:
-        base_char = get_base_elem(base)
+        base_char_dict = get_base_elem(cast(Dict[str, Any], base_node))
+        base_char = cast("AnyParseNode", base_char_dict)
         base_group = html.build_group(base_char, options.having_cramped_style())
         skew = assert_symbol_dom_node(base_group).skew
 
-    accent_below = (isinstance(accent_group, dict) and
-                    accent_group.get("label") == "\\c")
+    accent_below = accent_group.get("label") == "\\c"
 
     # Calculate clearance between body and accent
     if accent_below:
@@ -74,27 +79,29 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         clearance = min(body.height, options.font_metrics().get("xHeight", 0.4))
 
     # Build the accent
-    is_stretchy = (isinstance(accent_group, dict) and
-                   accent_group.get("isStretchy", False))
+    is_stretchy = bool(accent_group.get("isStretchy", False))
     if not is_stretchy:
         # Non-stretchy accent
-        label = accent_group.get("label", "") if isinstance(accent_group, dict) else ""
+        label = accent_group.get("label", "")
         if label == "\\vec":
-            accent = static_svg("vec", options)
+            accent_dom: DomNode = static_svg("vec", options)
             width = 0.471  # From svgData.vec[1]
+            symbol_node: Optional[SymbolNode] = None
         else:
-            mode = accent_group.get("mode", "math") if isinstance(accent_group, dict) else "math"
-            accent = make_ord({
+            mode = accent_group.get("mode", "math")
+            accent_dom_node = make_ord({
                 "mode": mode,
                 "text": label
             }, options, "textord")
-            accent = assert_symbol_dom_node(accent)
-            accent.italic = 0  # Remove italic correction
-            width = accent.width
+            symbol = cast("DomNode", accent_dom_node)
+            symbol_node = assert_symbol_dom_node(symbol)
+            symbol_node.italic = 0  # Remove italic correction
+            accent_dom = symbol_node
+            width = symbol_node.width
             if accent_below:
-                clearance += accent.depth
+                clearance += symbol_node.depth
 
-        accent_body = make_span(["accent-body"], [accent])
+        accent_body = make_span(["accent-body"], [accent_dom])
 
         # Handle full accents (like \textcircled)
         accent_full = label == "\\textcircled"
@@ -126,7 +133,7 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
         # Stretchy accent
         accent_body = svg_span(accent_group, options)
 
-        wrapper_style = None
+        wrapper_style: Optional[Dict[str, str]] = None
         if skew > 0:
             wrapper_style = {
                 "width": f"calc(100% - {make_em(2 * skew)})",
@@ -151,10 +158,15 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     # Handle supsub case
     if supsub_group is not None:
         # Replace base child with our accent
-        supsub_group.children[0] = accent_wrap
-        supsub_group.height = max(accent_wrap.height, supsub_group.height)
-        supsub_group.classes[0] = "mord"
-        return supsub_group
+        from ..dom_tree import Span as DomSpan
+
+        span_group = cast(DomSpan, supsub_group)
+        if span_group.children:
+            span_group.children[0] = accent_wrap
+        span_group.height = max(accent_wrap.height, span_group.height)
+        if span_group.classes:
+            span_group.classes[0] = "mord"
+        return span_group
     else:
         return accent_wrap
 

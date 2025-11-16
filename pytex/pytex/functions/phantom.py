@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, List, cast
 
 from ..build_common import make_fragment, make_span, make_v_list
 from ..define_function import define_function, ordargument
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 
 if TYPE_CHECKING:
     from ..options import Options
@@ -86,7 +87,7 @@ def _phantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     phantom_group = cast("PhantomParseNode", group)
     inner = mml.build_expression(phantom_group["body"], options)
-    return MathNode("mphantom", inner)
+    return MathNode("mphantom", cast(List[VirtualNode], inner))
 
 
 def _hphantom_html_builder(group: ParseNode, options: "Options") -> Any:
@@ -122,8 +123,8 @@ def _hphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     hphantom_group = cast("HphantomParseNode", group)
     inner = mml.build_expression(ordargument(hphantom_group["body"]), options)
-    phantom = MathNode("mphantom", inner)
-    node = MathNode("mpadded", [phantom])
+    phantom = MathNode("mphantom", cast(List[VirtualNode], inner))
+    node = MathNode("mpadded", cast(List[VirtualNode], [phantom]))
     node.set_attribute("height", "0px")
     node.set_attribute("depth", "0px")
     return node
@@ -149,7 +150,7 @@ def _vphantom_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     vphantom_group = cast("VphantomParseNode", group)
     inner = mml.build_expression(ordargument(vphantom_group["body"]), options)
-    phantom = MathNode("mphantom", inner)
-    node = MathNode("mpadded", [phantom])
+    phantom = MathNode("mphantom", cast(List[VirtualNode], inner))
+    node = MathNode("mpadded", cast(List[VirtualNode], [phantom]))
     node.set_attribute("width", "0px")
     return node

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict
 
-Measurement = Dict[str, float | str]
+from .units import Measurement
 
 THINSPACE: Measurement = {"number": 3, "unit": "mu"}
 MEDIUMSPACE: Measurement = {"number": 4, "unit": "mu"}

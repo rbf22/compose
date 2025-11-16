@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ..parse_node import ParseNode, TagParseNode
 
 
-def pad():
+def pad() -> MathNode:
     """Create a padding table cell."""
     pad_node = MathNode("mtd", [])
     pad_node.set_attribute("width", "50%")

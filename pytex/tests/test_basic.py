@@ -1,6 +1,6 @@
 """Comprehensive tests for KaTeX Python implementation."""
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 from typing import List, Any
 
 
@@ -117,7 +117,7 @@ class TestKaTeXErrorHandling:
 class TestKaTeXMathematicalExpressions:
     """Test various mathematical expressions."""
 
-    @pytest.mark.parametrize("expression,description", [
+    @pytest.mark.parametrize("expression,description", [  # type: ignore[misc]
         (r"x + y", "simple addition"),
         (r"a \cdot b", "multiplication dot"),
         (r"\frac{1}{2}", "simple fraction"),
@@ -176,7 +176,7 @@ class TestKaTeXIntegration:
 
 
 # Fixtures for more complex tests
-@pytest.fixture
+@pytest.fixture  # type: ignore[misc]
 def sample_expressions() -> List[str]:
     """Provide sample LaTeX expressions for testing."""
     return [
@@ -188,7 +188,7 @@ def sample_expressions() -> List[str]:
     ]
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[misc]
 def katex_module() -> Any:
     """Provide the katex module for testing."""
     import pytex.katex as katex

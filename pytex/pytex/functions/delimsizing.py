@@ -2,22 +2,31 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, cast
 
 from ..build_common import make_span
 from ..define_function import define_function
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 from ..parse_error import ParseError
 from ..parse_node import assert_node_type, check_symbol_node_type
+from ..types import Mode
 from ..units import make_em
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import AnyParseNode, DelimsizingParseNode, LeftrightParseNode, MiddleParseNode, ParseNode, SymbolParseNode
-    from ..define_function import FunctionContext
+    from ..parse_node import (
+        AnyParseNode,
+        DelimsizingParseNode,
+        LeftrightParseNode,
+        LeftrightRightParseNode,
+        MiddleParseNode,
+        ParseNode,
+        SymbolParseNode,
+    )
 
 # Delimiter size configurations
-DELIMITER_SIZES = {
+DELIMITER_SIZES: Dict[str, Dict[str, Union[str, int]]] = {
     "\\bigl": {"mclass": "mopen", "size": 1},
     "\\Bigl": {"mclass": "mopen", "size": 2},
     "\\biggl": {"mclass": "mopen", "size": 3},
@@ -56,6 +65,28 @@ DELIMITERS = [
 ]
 
 
+def _ensure_mode(mode_value: Optional[Union[str, Mode]]) -> Mode:
+    """Normalize optional mode values to the Mode enum."""
+    if isinstance(mode_value, Mode):
+        return mode_value
+    if isinstance(mode_value, str):
+        try:
+            return Mode(mode_value)
+        except ValueError:
+            return Mode.MATH
+    return Mode.MATH
+
+
+def _size_to_max_height(size: int) -> float:
+    from .. import delimiter
+
+    heights = delimiter.SIZE_TO_MAX_HEIGHT
+    if not heights:
+        return 0.0
+    index = max(0, min(size, len(heights) - 1))
+    return float(heights[index])
+
+
 def check_delimiter(delim: AnyParseNode, context: Dict[str, Any]) -> SymbolParseNode:
     """Validate and return delimiter symbol."""
     sym_delim = check_symbol_node_type(delim)
@@ -64,10 +95,13 @@ def check_delimiter(delim: AnyParseNode, context: Dict[str, Any]) -> SymbolParse
     elif sym_delim:
         raise ParseError(
             f"Invalid delimiter '{sym_delim['text']}' after '{context['funcName']}'",
-            delim
+            context.get("token")
         )
     else:
-        raise ParseError(f"Invalid delimiter type '{delim.get('type', 'unknown')}'", delim)
+        raise ParseError(
+            f"Invalid delimiter type '{delim.get('type', 'unknown')}'",
+            context.get("token")
+        )
 
 
 def assert_parsed(group: ParseNode) -> None:
@@ -135,7 +169,7 @@ define_function({
 def _delimsizing_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str, Any]:
     """Handler for delimiter sizing commands."""
     delim = check_delimiter(args[0], context)
-    size_info = DELIMITER_SIZES[context["funcName"]]
+    size_info = DELIMITER_SIZES.get(context["funcName"], {"mclass": "mord", "size": 1})
 
     return {
         "type": "delimsizing",
@@ -156,8 +190,9 @@ def _delimsizing_html_builder(group: ParseNode, options: "Options") -> Any:
 
     # Use delimiter.sizedDelim to generate the delimiter
     from .. import delimiter
+    mode = _ensure_mode(delimsizing_group.get("mode"))
     return delimiter.make_sized_delim(
-        delimsizing_group["delim"], delimsizing_group["size"], options, delimsizing_group.get("mode", "math"),
+        delimsizing_group["delim"], delimsizing_group["size"], options, mode,
         [delimsizing_group["mclass"]]
     )
 
@@ -165,13 +200,13 @@ def _delimsizing_html_builder(group: ParseNode, options: "Options") -> Any:
 def _delimsizing_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for sized delimiters."""
     from .. import build_mathml as mml
-    from .. import delimiter
 
     delimsizing_group = cast("DelimsizingParseNode", group)
-    children = []
+    children: List[VirtualNode] = []
 
+    mode = _ensure_mode(delimsizing_group.get("mode"))
     if delimsizing_group["delim"] != ".":
-        children.append(mml.make_text(delimsizing_group["delim"], delimsizing_group.get("mode", "math")))
+        children.append(mml.make_text(delimsizing_group["delim"], mode))
 
     node = MathNode("mo", children)
 
@@ -183,9 +218,10 @@ def _delimsizing_mathml_builder(group: ParseNode, options: "Options") -> MathNod
         node.set_attribute("fence", "false")
 
     node.set_attribute("stretchy", "true")
-    size = make_em(delimiter.SIZE_TO_MAX_HEIGHT.get(delimsizing_group["size"], 0))
-    node.set_attribute("minsize", size)
-    node.set_attribute("maxsize", size)
+    size_value = _size_to_max_height(delimsizing_group["size"])
+    size_em = make_em(size_value)
+    node.set_attribute("minsize", size_em)
+    node.set_attribute("maxsize", size_em)
 
     return node
 
@@ -217,7 +253,7 @@ def _left_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str
 
     # Check the next token
     parser.expect("\\right", False)
-    right = assert_node_type(parser.parse_function(), "leftright-right")
+    right = cast("LeftrightRightParseNode", assert_node_type(parser.parse_function(), "leftright-right"))
 
     return {
         "type": "leftright",
@@ -239,13 +275,14 @@ def _leftright_html_builder(group: ParseNode, options: "Options") -> Any:
     # Build the inner expression
     inner = html.build_expression(leftright_group["body"], options, True, ["mopen", "mclose"])
 
-    inner_height = 0
-    inner_depth = 0
+    inner_height: float = 0.0
+    inner_depth: float = 0.0
     had_middle = False
 
     # Calculate height and depth
     for item in inner:
-        if hasattr(item, 'is_middle') and item.is_middle:
+        middle_info = getattr(item, "is_middle", None)
+        if middle_info:
             had_middle = True
         else:
             inner_height = max(item.height, inner_height)
@@ -260,9 +297,9 @@ def _leftright_html_builder(group: ParseNode, options: "Options") -> Any:
     if leftright_group["left"] == ".":
         left_delim = html.make_null_delimiter(options, ["mopen"])
     else:
+        mode = _ensure_mode(leftright_group.get("mode"))
         left_delim = delimiter.make_left_right_delim(
-            leftright_group["left"], inner_height, inner_depth, options,
-            leftright_group.get("mode", "math"), ["mopen"]
+            leftright_group["left"], inner_height, inner_depth, options, mode, ["mopen"]
         )
     inner.insert(0, left_delim)
 
@@ -270,23 +307,23 @@ def _leftright_html_builder(group: ParseNode, options: "Options") -> Any:
     if had_middle:
         for i in range(1, len(inner)):
             item = inner[i]
-            if hasattr(item, 'is_middle') and item.is_middle:
+            middle_info = getattr(item, "is_middle", None)
+            if middle_info:
                 # Apply the options that were active when \middle was called
-                middle_info = item.is_middle
                 inner[i] = delimiter.make_left_right_delim(
                     middle_info["delim"], inner_height, inner_depth,
-                    middle_info["options"], leftright_group.get("mode", "math"), []
+                    middle_info["options"], _ensure_mode(leftright_group.get("mode")), []
                 )
 
     # Right delimiter (with color support)
     if leftright_group["right"] == ".":
         right_delim = html.make_null_delimiter(options, ["mclose"])
     else:
-        color_options = (options.with_color(leftright_group["rightColor"])
-                        if leftright_group.get("rightColor") else options)
+        color_value = leftright_group.get("rightColor")
+        color_options = options.with_color(color_value) if color_value else options
         right_delim = delimiter.make_left_right_delim(
             leftright_group["right"], inner_height, inner_depth, color_options,
-            leftright_group.get("mode", "math"), ["mclose"]
+            _ensure_mode(leftright_group.get("mode")), ["mclose"]
         )
     inner.append(right_delim)
 
@@ -301,17 +338,19 @@ def _leftright_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     assert_parsed(leftright_group)
     inner = mml.build_expression(leftright_group["body"], options)
 
+    mode = _ensure_mode(leftright_group.get("mode"))
     if leftright_group["left"] != ".":
-        left_node = MathNode("mo", [mml.make_text(leftright_group["left"], leftright_group.get("mode", "math"))])
+        left_node = MathNode("mo", [mml.make_text(leftright_group["left"], mode)])
         left_node.set_attribute("fence", "true")
         inner.insert(0, left_node)
 
     if leftright_group["right"] != ".":
-        right_node = MathNode("mo", [mml.make_text(leftright_group["right"], leftright_group.get("mode", "math"))])
+        right_node = MathNode("mo", [mml.make_text(leftright_group["right"], mode)])
         right_node.set_attribute("fence", "true")
 
-        if leftright_group.get("rightColor"):
-            right_node.set_attribute("mathcolor", leftright_group["rightColor"])
+        right_color = leftright_group.get("rightColor")
+        if isinstance(right_color, str):
+            right_node.set_attribute("mathcolor", right_color)
 
         inner.append(right_node)
 
@@ -323,7 +362,7 @@ def _middle_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[s
     delim = check_delimiter(args[0], context)
 
     if not context["parser"].leftright_depth:
-        raise ParseError("\\middle without preceding \\left", delim)
+        raise ParseError("\\middle without preceding \\left", context.get("token"))
 
     return {
         "type": "middle",
@@ -342,14 +381,14 @@ def _middle_html_builder(group: ParseNode, options: "Options") -> Any:
         middle_delim = html.make_null_delimiter(options, [])
     else:
         middle_delim = delimiter.make_sized_delim(
-            middle_group["delim"], 1, options, middle_group.get("mode", "math"), []
+            middle_group["delim"], 1, options, _ensure_mode(middle_group.get("mode")), []
         )
 
         # Store middle information for later processing
-        middle_delim.is_middle = {
+        setattr(middle_delim, "is_middle", {
             "delim": middle_group["delim"],
             "options": options
-        }
+        })
 
     return middle_delim
 
@@ -361,9 +400,9 @@ def _middle_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     middle_group = cast("MiddleParseNode", group)
     # Use plain "|" instead of \vert for Firefox compatibility
     if middle_group["delim"] in ("\\vert", "|"):
-        text_node = mml.make_text("|", "text")
+        text_node = mml.make_text("|", Mode.TEXT)
     else:
-        text_node = mml.make_text(middle_group["delim"], middle_group.get("mode", "math"))
+        text_node = mml.make_text(middle_group["delim"], _ensure_mode(middle_group.get("mode")))
 
     middle_node = MathNode("mo", [text_node])
     middle_node.set_attribute("fence", "true")

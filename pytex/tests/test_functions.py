@@ -2,13 +2,13 @@
 
 import importlib.util
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 
 
 class TestFunctionImports:
     """Test that all function modules can be imported."""
 
-    def test_all_function_modules_importable(self):
+    def test_all_function_modules_importable(self) -> None:
         """Test that all 46 function modules can be imported."""
         function_modules = [
             'accent', 'accentunder', 'arrow', 'char', 'color', 'cr', 'def', 'delimsizing',
@@ -33,7 +33,7 @@ class TestFunctionImports:
         # At minimum, we should be able to import some modules
         assert imported_count > 0
 
-    def test_core_functions_exist(self):
+    def test_core_functions_exist(self) -> None:
         """Test that core mathematical functions are available."""
         # Test that some key functions are discoverable in the package
         function_names = [
@@ -56,16 +56,17 @@ class TestFunctionImports:
 class TestEnvironmentImports:
     """Test that environment modules can be imported."""
 
-    def test_array_environment_importable(self):
+    def test_array_environment_importable(self) -> None:
         """Test that the array environment can be imported."""
         try:
             import pytex.environments.array
             assert hasattr(pytex.environments.array, 'parse_array')
             assert hasattr(pytex.environments.array, 'html_builder')
+            assert hasattr(pytex.environments.array, 'mathml_builder')
         except ImportError as e:
             pytest.skip(f"Array environment not implemented: {e}")
 
-    def test_environment_functions_exist(self):
+    def test_environment_functions_exist(self) -> None:
         """Test that environment has expected functions."""
         try:
             import pytex.environments.array as array_env
@@ -79,7 +80,7 @@ class TestEnvironmentImports:
 class TestUtilityImports:
     """Test that utility modules can be imported."""
 
-    def test_assemble_supsub_utility(self):
+    def test_assemble_supsub_utility(self) -> None:
         """Test that the assembleSupSub utility can be imported."""
         try:
             from pytex.functions.utils.assembleSupSub import assembleSupSub

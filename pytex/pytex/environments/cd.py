@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..build_common import wrap_fragment
 from ..define_function import define_function
+from ..dom_tree import DomSpan
 from ..mathml_tree import MathNode
 from ..parse_error import ParseError
-from ..parse_node import assert_symbol_node_type
+from ..parse_node import AnyParseNode, ParseNode, assert_symbol_node_type
+from ..types import BreakToken
 from ..units import make_em
 
 if TYPE_CHECKING:
     from ..parser import Parser
-    from ..parse_node import AnyParseNode, ParseNode
+    from ..options import Options
 
 # CD arrow function name mapping
 CD_ARROW_FUNCTION_NAME = {
@@ -27,7 +29,7 @@ CD_ARROW_FUNCTION_NAME = {
 }
 
 
-def new_cell():
+def new_cell() -> Dict[str, Any]:
     """Create an empty CD cell."""
     return {
         "type": "styling",
@@ -48,48 +50,48 @@ def is_label_end(node: AnyParseNode, end_char: str) -> bool:
             node.get("text") == end_char)
 
 
-def cd_arrow(arrow_char: str, labels: List[ParseNode], parser: Parser) -> AnyParseNode:
+def cd_arrow(arrow_char: str, labels: List[AnyParseNode], parser: "Parser") -> AnyParseNode:
     """Create a parse tree for an arrow and its labels."""
     func_name = CD_ARROW_FUNCTION_NAME.get(arrow_char, "no arrow")
 
-    if func_name in ("\\\\cdrightarrow", "\\\\cdleftarrow"):
-        return parser.call_function(func_name, [labels[0]], [labels[1]])
+    if func_name in ("\\cdrightarrow", "\\cdleftarrow"):
+        return cast(AnyParseNode, parser.call_function(func_name, [labels[0]], [labels[1]]))
     elif func_name in ("\\uparrow", "\\downarrow"):
-        left_label = parser.call_function("\\\\cdleft", [labels[0]], [])
+        left_label = cast(AnyParseNode, parser.call_function("\\cdleft", [labels[0]], []))
         bare_arrow = {
             "type": "atom",
             "text": func_name,
             "mode": "math",
             "family": "rel",
         }
-        sized_arrow = parser.call_function("\\Big", [bare_arrow], [])
-        right_label = parser.call_function("\\\\cdright", [labels[1]], [])
+        sized_arrow = cast(AnyParseNode, parser.call_function("\\Big", [bare_arrow], []))
+        right_label = cast(AnyParseNode, parser.call_function("\\cdright", [labels[1]], []))
         arrow_group = {
             "type": "ordgroup",
             "mode": "math",
             "body": [left_label, sized_arrow, right_label],
         }
-        return parser.call_function("\\\\cdparent", [arrow_group], [])
-    elif func_name == "\\\\cdlongequal":
-        return parser.call_function("\\\\cdlongequal", [], [])
+        return cast(AnyParseNode, parser.call_function("\\cdparent", [arrow_group], []))
+    elif func_name == "\\cdlongequal":
+        return cast(AnyParseNode, parser.call_function("\\cdlongequal", [], []))
     elif func_name == "\\Vert":
         arrow = {"type": "textord", "text": "\\Vert", "mode": "math"}
-        return parser.call_function("\\Big", [arrow], [])
+        return cast(AnyParseNode, parser.call_function("\\Big", [arrow], []))
     else:
-        return {"type": "textord", "text": " ", "mode": "math"}
+        return cast(AnyParseNode, {"type": "textord", "text": " ", "mode": "math"})
 
 
-def parse_cd(parser: Parser) -> ParseNode:
+def parse_cd(parser: "Parser") -> ParseNode:
     """Parse a commutative diagram (CD) environment."""
     # Get the array's parse nodes with \\ temporarily mapped to \cr
-    parsed_rows = []
+    parsed_rows: List[List[AnyParseNode]] = []
     parser.gullet.begin_group()
     parser.gullet.macros.set("\\cr", "\\\\\\relax")
     parser.gullet.begin_group()
 
     while True:
         # Get the parse nodes for the next row
-        parsed_rows.append(parser.parse_expression(False, "\\\\"))
+        parsed_rows.append(parser.parse_expression(False, BreakToken.DOUBLE_BACKSLASH))
         parser.gullet.end_group()
         parser.gullet.begin_group()
 
@@ -103,8 +105,8 @@ def parse_cd(parser: Parser) -> ParseNode:
         else:
             raise ParseError("Expected \\\\ or \\cr or \\end", parser.next_token)
 
-    row = []
-    body = [row]
+    row: List[Dict[str, Any]] = []
+    body: List[List[Dict[str, Any]]] = [row]
 
     # Loop through parse nodes, collecting into cells and arrows
     for i, row_nodes in enumerate(parsed_rows):
@@ -125,10 +127,13 @@ def parse_cd(parser: Parser) -> ParseNode:
                 # Now collect parse nodes into an arrow
                 # The character after "@" defines the arrow type
                 j += 1
-                arrow_char = assert_symbol_node_type(row_nodes[j])["text"]
+                symbol = assert_symbol_node_type(row_nodes[j])
+                if symbol is None:
+                    raise ParseError("Expected symbol node in CD arrow.", row_nodes[j])
+                arrow_char = cast(Dict[str, Any], symbol)["text"]
 
                 # Create two empty label nodes
-                labels = [
+                labels: List[Dict[str, Any]] = [
                     {"type": "ordgroup", "mode": "math", "body": []},
                     {"type": "ordgroup", "mode": "math", "body": []},
                 ]
@@ -163,7 +168,7 @@ def parse_cd(parser: Parser) -> ParseNode:
                     raise ParseError('Expected one of "<>AV=|." after @', row_nodes[j])
 
                 # Join the arrow to its labels
-                arrow = cd_arrow(arrow_char, labels, parser)
+                arrow = cd_arrow(arrow_char, cast(List[AnyParseNode], labels), parser)
 
                 # Wrap the arrow in styling node
                 wrapped_arrow = {
@@ -195,14 +200,14 @@ def parse_cd(parser: Parser) -> ParseNode:
     parser.gullet.end_group()
 
     # Define column separation
-    cols = [{
+    cols: List[Dict[str, Any]] = [{
         "type": "align",
         "align": "c",
         "pregap": 0.25,  # CD package sets \enskip between columns
         "postgap": 0.25,  # So pre and post each get half an \enskip, i.e. 0.25em
     }] * len(body[0])
 
-    return {
+    array_node: Dict[str, Any] = {
         "type": "array",
         "mode": "math",
         "body": body,
@@ -212,7 +217,12 @@ def parse_cd(parser: Parser) -> ParseNode:
         "cols": cols,
         "colSeparationType": "CD",
         "hLinesBeforeRow": [[]] * (len(body) + 1),
+        "hskipBeforeAndAfter": False,
+        "tags": None,
+        "leqno": False,
     }
+
+    return cast(ParseNode, array_node)
 
 
 # CD label functions for internal use by CD environment
@@ -248,23 +258,21 @@ define_function({
 })
 
 
-def _cdlabel_html_builder(group, options):
+def _cdlabel_html_builder(group: Dict[str, Any], options: "Options") -> DomSpan:
     """Build HTML for CD label."""
     from .. import build_html as html
 
     new_options = options.having_style(options.style.sup())
-    label = wrap_fragment(
-        html.build_group(group["label"], new_options, options), options
-    )
+    label = wrap_fragment(html.build_group(group["label"], new_options), options)
     label.classes.append(f"cd-label-{group['side']}")
     label.style["bottom"] = make_em(0.8 - label.depth)
     # Zero out label height & depth for proper arrow alignment
     label.height = 0
     label.depth = 0
-    return label
+    return cast(DomSpan, label)
 
 
-def _cdlabel_mathml_builder(group, options):
+def _cdlabel_mathml_builder(group: Dict[str, Any], options: "Options") -> MathNode:
     """Build MathML for CD label."""
     from .. import build_mathml as mml
 
@@ -281,19 +289,17 @@ def _cdlabel_mathml_builder(group, options):
     return label
 
 
-def _cdlabelparent_html_builder(group, options):
+def _cdlabelparent_html_builder(group: Dict[str, Any], options: "Options") -> DomSpan:
     """Build HTML for CD label parent."""
     from .. import build_html as html
 
     # Wrap the vertical arrow and its labels
-    parent = wrap_fragment(
-        html.build_group(group["fragment"], options), options
-    )
+    parent = wrap_fragment(html.build_group(group["fragment"], options), options)
     parent.classes.append("cd-vert-arrow")
-    return parent
+    return cast(DomSpan, parent)
 
 
-def _cdlabelparent_mathml_builder(group, options):
+def _cdlabelparent_mathml_builder(group: Dict[str, Any], options: "Options") -> MathNode:
     """Build MathML for CD label parent."""
     from .. import build_mathml as mml
 

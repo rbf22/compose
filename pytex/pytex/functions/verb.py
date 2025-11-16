@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from ..build_common import make_span, make_symbol, try_combine_chars
+from ..dom_tree import DomNode, SymbolNode
 from ..define_function import define_function
 from ..mathml_tree import MathNode, TextNode
 from ..parse_error import ParseError
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode, VerbParseNode
+    from ..parse_node import AnyParseNode, ParseNode, VerbParseNode
 
 
 def make_verb(group: ParseNode) -> str:
@@ -36,7 +37,7 @@ define_function({
 })
 
 
-def _verb_handler(context, args, opt_args) -> Any:
+def _verb_handler(context: Dict[str, Any], args: List[AnyParseNode], opt_args: List[Optional[AnyParseNode]]) -> Any:
     """Handler for \verb command."""
     # \verb and \verb* are handled directly in Parser.js
     # If we get here, it's due to a parsing failure
@@ -47,7 +48,7 @@ def _verb_html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for verb command."""
     verb_group = cast("VerbParseNode", group)
     text = make_verb(verb_group)
-    body = []
+    body: List[SymbolNode] = []
 
     # \verb enters text mode and is sized like \textstyle
     new_options = options.having_style(options.style.text())
@@ -55,12 +56,13 @@ def _verb_html_builder(group: ParseNode, options: "Options") -> Any:
     for c in text:
         if c == '~':
             c = '\\textasciitilde'
-        body.append(make_symbol(c, "Typewriter-Regular", verb_group["mode"], new_options,
-                              ["mord", "texttt"]))
+        symbol = make_symbol(c, "Typewriter-Regular", verb_group["mode"], new_options,
+                             ["mord", "texttt"])
+        body.append(symbol)
 
     return make_span(
         ["mord", "text"] + new_options.sizing_classes(options),
-        try_combine_chars(body),
+        try_combine_chars(cast(List[DomNode], body)),
         new_options
     )
 

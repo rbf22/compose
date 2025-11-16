@@ -12,7 +12,7 @@ from ..units import calculate_size
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode, RaiseboxParseNode
+    from ..parse_node import ParseNode, RaiseboxParseNode, SizeParseNode
 
 
 # Raisebox for vertical positioning
@@ -24,15 +24,20 @@ define_function({
         "argTypes": ["size", "hbox"],
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
-        "type": "raisebox",
-        "mode": context["parser"].mode,
-        "dy": assert_node_type(args[0], "size")["value"],
-        "body": args[1],
-    },
+    "handler": lambda context, args: _raisebox_handler(context, args),
     "html_builder": lambda group, options: _raisebox_html_builder(group, options),
     "mathml_builder": lambda group, options: _raisebox_mathml_builder(group, options),
 })
+
+
+def _raisebox_handler(context: Any, args: Any) -> Any:
+    size_node = cast("SizeParseNode", assert_node_type(args[0], "size"))
+    return {
+        "type": "raisebox",
+        "mode": context["parser"].mode,
+        "dy": size_node["value"],
+        "body": args[1],
+    }
 
 
 def _raisebox_html_builder(group: ParseNode, options: "Options") -> Any:

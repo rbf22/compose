@@ -39,8 +39,11 @@ def options_with_font(group: ParseNode, options: "Options") -> "Options":
     font = text_group.get("font")
     if not font:
         return options
-    elif font in TEXT_FONT_FAMILIES and TEXT_FONT_FAMILIES[font]:
-        return options.with_text_font_family(TEXT_FONT_FAMILIES[font])
+    elif font in TEXT_FONT_FAMILIES:
+        family = TEXT_FONT_FAMILIES[font]
+        if family:
+            return options.with_text_font_family(family)
+        return options
     elif font in TEXT_FONT_WEIGHTS:
         return options.with_text_font_weight(TEXT_FONT_WEIGHTS[font])
     elif font == "\\emph":

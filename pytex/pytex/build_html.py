@@ -2,31 +2,30 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Union, Dict, Any
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
 
 from .build_common import make_span, try_combine_chars
 from .dom_tree import Anchor, DomSpan, HtmlDomNode, Span
 from .parse_error import ParseError
 from .style import Style
 from .tree import DocumentFragment
-from .units import make_em
+from .units import Measurement, make_em
 
 # Placeholder imports
 try:
-    from .define_function import _html_group_builders as group_builders
-except ImportError:
-    group_builders = {}
+    from .define_function import _htmlGroupBuilders as group_builders
+except ImportError:  # pragma: no cover - fallback path
+    from .define_function import HTML_GROUP_BUILDERS as group_builders
 
 try:
-    from .spacing_data import spacings, tight_spacings
-except ImportError:
-    spacings = {}
-    tight_spacings = {}
+    from .spacing_data import SPACINGS, TIGHT_SPACINGS
+except ImportError:  # pragma: no cover - fallback path
+    SPACINGS = {}
+    TIGHT_SPACINGS = {}
 
 if TYPE_CHECKING:
     from .options import Options
     from .parse_node import AnyParseNode
-    from .dom_tree import DomSpan
 
 # Binary atoms (first class `mbin`) change into ordinary atoms (`mord`)
 # depending on their surroundings. See TeXbook pg. 442-446, Rules 5 and 6,
@@ -58,10 +57,10 @@ DomType = str
 
 
 def build_expression(
-    expression: List[AnyParseNode],
-    options: Options,
+    expression: List["AnyParseNode"],
+    options: "Options",
     is_real_group: Union[bool, str],
-    surrounding: List[Optional[DomType]] = None,
+    surrounding: Optional[List[Optional[DomType]]] = None,
 ) -> List[HtmlDomNode]:
     """Build HTML nodes from parse nodes."""
     if surrounding is None:
@@ -72,7 +71,7 @@ def build_expression(
     for expr in expression:
         output = build_group(expr, options)
         if isinstance(output, DocumentFragment):
-            groups.extend(output.children)
+            groups.extend(cast(List[HtmlDomNode], list(output.children)))
         else:
             groups.append(output)
 
@@ -83,15 +82,21 @@ def build_expression(
     if not is_real_group:
         return groups
 
-    glue_options = options
+    glue_options: "Options" = options
     if len(expression) == 1:
         node = expression[0]
-        if node.get("type") == "sizing":
-            glue_options = options.having_size(node.get("size", 6))
-        elif node.get("type") == "styling":
-            style_name = node.get("style", "text")
-            if style_name in STYLE_MAP:
-                glue_options = options.having_style(STYLE_MAP[style_name])
+        if isinstance(node, dict):
+            node_type = node.get("type")
+            if node_type == "sizing":
+                size_val = node.get("size")
+                if isinstance(size_val, int):
+                    glue_options = options.having_size(size_val)
+            elif node_type == "styling":
+                style_name = node.get("style")
+                if isinstance(style_name, str):
+                    style = STYLE_MAP.get(style_name)
+                    if style is not None:
+                        glue_options = options.having_style(style)
 
     # Dummy spans for determining spacings
     dummy_prev = make_span([surrounding[0] or "leftmost"], [], options)
@@ -99,32 +104,51 @@ def build_expression(
 
     # Perform bin cancellation
     is_root = (is_real_group == "root")
-    traverse_non_space_nodes(groups, lambda node, prev: (
-        setattr(prev, 'classes', prev.classes[:1] + ["mord"])
-        if (prev.classes[0] == "mbin" and BIN_RIGHT_CANCELLER.count(node.classes[0]) > 0)
-        else setattr(node, 'classes', node.classes[:1] + ["mord"])
-        if (node.classes[0] == "mbin" and BIN_LEFT_CANCELLER.count(prev.classes[0]) > 0)
-        else None
-    ), {"node": dummy_prev}, dummy_next, is_root)
+    traverse_non_space_nodes(
+        groups,
+        lambda node, prev: (
+            setattr(prev, "classes", prev.classes[:1] + ["mord"])
+            if (prev.classes and prev.classes[0] == "mbin" and BIN_RIGHT_CANCELLER.count(node.classes[0]) > 0)
+            else setattr(node, "classes", node.classes[:1] + ["mord"])
+            if (node.classes and node.classes[0] == "mbin" and BIN_LEFT_CANCELLER.count(prev.classes[0]) > 0)
+            else None
+        ),
+        {"node": dummy_prev},
+        dummy_next,
+        is_root,
+    )
 
     # Insert spacing
-    traverse_non_space_nodes(groups, lambda node, prev: (
-        build_common_make_glue(
-            tight_spacings.get(get_type_of_dom_tree(prev), {}).get(get_type_of_dom_tree(node), 0)
-            if node.has_class("mtight")
-            else spacings.get(get_type_of_dom_tree(prev), {}).get(get_type_of_dom_tree(node), 0),
-            glue_options
-        ) if (get_type_of_dom_tree(prev) and get_type_of_dom_tree(node) and
-              spacings.get(get_type_of_dom_tree(prev), {}).get(get_type_of_dom_tree(node)))
-        else None
-    ), {"node": dummy_prev}, dummy_next, is_root)
+    def _spacing_cb(node: HtmlDomNode, prev_node: HtmlDomNode) -> Optional[HtmlDomNode]:
+        left_type = get_type_of_dom_tree(prev_node)
+        right_type = get_type_of_dom_tree(node)
+        if not left_type or not right_type:
+            return None
+
+        table = TIGHT_SPACINGS if node.has_class("mtight") else SPACINGS
+        row = table.get(left_type)
+        if not row:
+            return None
+        space = row.get(right_type)
+        if space is None:
+            return None
+
+        return build_common_make_glue(space, glue_options)
+
+    traverse_non_space_nodes(
+        groups,
+        _spacing_cb,
+        {"node": dummy_prev},
+        dummy_next,
+        is_root,
+    )
 
     return groups
 
 
 def traverse_non_space_nodes(
     nodes: List[HtmlDomNode],
-    callback: callable,
+    callback: Callable[[HtmlDomNode, HtmlDomNode], Optional[HtmlDomNode]],
     prev: Dict[str, Any],
     next_node: Optional[HtmlDomNode],
     is_root: bool,
@@ -139,8 +163,9 @@ def traverse_non_space_nodes(
         partial_group = check_partial_group(node)
 
         if partial_group:
-            # Recursive DFS
-            traverse_non_space_nodes(partial_group.children, callback, prev, None, is_root)
+            # Recursive DFS on a copy of children list for type safety
+            child_nodes = cast(List[HtmlDomNode], list(partial_group.children))
+            traverse_non_space_nodes(child_nodes, callback, prev, None, is_root)
         else:
             # Ignore spaces when determining spacing
             nonspace = not node.has_class("mspace")
@@ -158,7 +183,7 @@ def traverse_non_space_nodes(
             elif is_root and node.has_class("newline"):
                 prev["node"] = make_span(["leftmost"])
 
-        def insert_after(index: int):
+        def insert_after(index: int) -> Callable[[HtmlDomNode], None]:
             def _insert(n: HtmlDomNode) -> None:
                 nodes.insert(index + 1, n)
                 nonlocal i
@@ -174,8 +199,9 @@ def traverse_non_space_nodes(
 
 def check_partial_group(node: HtmlDomNode) -> Optional[Union[DocumentFragment, Anchor, DomSpan]]:
     """Check if node is a partial group."""
-    if isinstance(node, DocumentFragment) or isinstance(node, Anchor) or \
-       (isinstance(node, Span) and node.has_class("enclosing")):
+    if isinstance(node, DocumentFragment) or isinstance(node, Anchor) or (
+        isinstance(node, Span) and node.has_class("enclosing")
+    ):
         return node
     return None
 
@@ -185,9 +211,9 @@ def get_outermost_node(node: HtmlDomNode, side: Side) -> HtmlDomNode:
     partial_group = check_partial_group(node)
     if partial_group and partial_group.children:
         if side == "right":
-            return get_outermost_node(partial_group.children[-1], "right")
+            return get_outermost_node(cast(HtmlDomNode, partial_group.children[-1]), "right")
         elif side == "left":
-            return get_outermost_node(partial_group.children[0], "left")
+            return get_outermost_node(cast(HtmlDomNode, partial_group.children[0]), "left")
     return node
 
 
@@ -203,16 +229,16 @@ def get_type_of_dom_tree(node: Optional[HtmlDomNode], side: Optional[Side] = Non
     return DOM_ENUM.get(node.classes[0]) if node.classes else None
 
 
-def make_null_delimiter(options: Options, classes: List[str]) -> DomSpan:
+def make_null_delimiter(options: "Options", classes: List[str]) -> DomSpan:
     """Create null delimiter span."""
     more_classes = ["nulldelimiter"] + options.base_sizing_classes()
     return make_span(classes + more_classes)
 
 
 def build_group(
-    group: Optional[AnyParseNode],
-    options: Options,
-    base_options: Optional[Options] = None,
+    group: Optional["AnyParseNode"],
+    options: "Options",
+    base_options: Optional["Options"] = None,
 ) -> HtmlDomNode:
     """Build HTML for a parse group."""
     if not group:
@@ -220,7 +246,7 @@ def build_group(
 
     if group["type"] in group_builders:
         # Call the group builder function
-        group_node = group_builders[group["type"]](group, options)
+        group_node = cast(HtmlDomNode, group_builders[group["type"]](group, options))
 
         # Handle size changes between parent and child
         if base_options and options.size != base_options.size:
@@ -236,7 +262,7 @@ def build_group(
         raise ParseError(f"Got group of unknown type: '{group['type']}'")
 
 
-def build_html_unbreakable(children: List[HtmlDomNode], options: Options) -> DomSpan:
+def build_html_unbreakable(children: List[HtmlDomNode], options: "Options") -> DomSpan:
     """Create unbreakable HTML unit."""
     body = make_span(["base"], children, options)
 
@@ -250,26 +276,28 @@ def build_html_unbreakable(children: List[HtmlDomNode], options: Options) -> Dom
     return body
 
 
-def build_html(tree: List[AnyParseNode], options: Options) -> DomSpan:
+def build_html(tree: List["AnyParseNode"], options: "Options") -> DomSpan:
     """Build complete HTML representation."""
     # Strip outer tag wrapper
-    tag = None
+    tag: Optional[List["AnyParseNode"]] = None
     if len(tree) == 1 and tree[0].get("type") == "tag":
-        tag = tree[0].get("tag")
-        tree = tree[0].get("body", [])
+        raw_tag = tree[0].get("tag")
+        if isinstance(raw_tag, list):
+            tag = cast(List["AnyParseNode"], raw_tag)
+        tree = cast(List["AnyParseNode"], tree[0].get("body", []))
 
     # Build the expression
     expression = build_expression(tree, options, "root")
 
-    eqn_num = None
+    eqn_num: Optional[HtmlDomNode] = None
     if len(expression) == 2 and expression[1].has_class("tag"):
         # Environment with automatic equation numbers
         eqn_num = expression.pop()
 
-    children = []
+    children: List[HtmlDomNode] = []
 
     # Create unbreakable units between line breaks
-    parts = []
+    parts: List[HtmlDomNode] = []
     i = 0
     while i < len(expression):
         parts.append(expression[i])
@@ -307,10 +335,11 @@ def build_html(tree: List[AnyParseNode], options: Options) -> DomSpan:
         children.append(build_html_unbreakable(parts, options))
 
     # Add tag if present
-    tag_child = None
+    tag_child: Optional[DomSpan] = None
     if tag:
         tag_child = build_html_unbreakable(
-            build_expression(tag, options, True)
+            build_expression(tag, options, True),
+            options,
         )
         tag_child.classes = ["tag"]
         children.append(tag_child)
@@ -330,10 +359,10 @@ def build_html(tree: List[AnyParseNode], options: Options) -> DomSpan:
     return html_node
 
 
-def build_common_make_glue(space: Union[str, float], options: Options) -> DomSpan:
-    """Create glue (spacing) span."""
+def build_common_make_glue(space: Measurement, options: "Options") -> DomSpan:
+    """Create glue (spacing) span from a numeric measurement mapping."""
     from .build_common import make_glue
-    return make_glue({"size": space}, options)
+    return make_glue(space, options)
 
 
 __all__ = [

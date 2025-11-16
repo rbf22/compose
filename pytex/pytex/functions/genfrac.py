@@ -388,7 +388,7 @@ def _genfrac_full_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str,
 
 
 def _above_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
-    """Handler for \above command."""
+    r"""Handler for \above command."""
     from ..parse_node import assert_node_type
 
     return {

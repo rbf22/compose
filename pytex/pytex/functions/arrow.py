@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from ..build_common import make_span, make_v_list, wrap_fragment
 from ..define_function import define_function
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..parse_node import ParseNode, XArrowParseNode
 
 
-def padded_node(group=None):
+def padded_node(group: Optional[MathNode] = None) -> MathNode:
     """Create a padded MathML node."""
     node = MathNode("mpadded", [group] if group else [])
     node.set_attribute("width", "+0.6em")

@@ -2,8 +2,12 @@
 
 import sys
 import os
+from typing import Any
 
-from fontTools.ttLib import TTFont, sfnt
+from fontTools.ttLib import TTFont
+import fontTools.ttLib as ttLib
+
+sfnt: Any = ttLib.sfnt  # type: ignore[attr-defined]
 sfnt.USE_ZOPFLI = True
 
 if len(sys.argv) < 2:
@@ -14,7 +18,7 @@ font_file = sys.argv[1]
 font_name = os.path.splitext(os.path.basename(font_file))[0]
 
 
-font = TTFont(font_file, recalcBBoxes=False, recalcTimestamp=False)
+font: Any = TTFont(font_file, recalcBBoxes=False, recalcTimestamp=False)
 
 # fix timestamp to the epoch
 font['head'].created = 0

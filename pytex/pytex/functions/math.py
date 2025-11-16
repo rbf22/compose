@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from ..define_function import define_function
 from ..parse_error import ParseError
@@ -36,7 +36,7 @@ define_function({
 })
 
 
-def _math_delimiter_handler(context, args) -> Dict[str, Any]:
+def _math_delimiter_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
     r"""Handler for opening math delimiters (\(, $)."""
     func_name = context["funcName"]
     parser = context["parser"]
@@ -60,7 +60,7 @@ def _math_delimiter_handler(context, args) -> Dict[str, Any]:
     }
 
 
-def _closing_delimiter_handler(context, args) -> None:
+def _closing_delimiter_handler(context: Dict[str, Any], args: List[Any]) -> None:
     r"""Handler for closing math delimiters (\), \]) - throws error for mismatches."""
     func_name = context["funcName"]
     raise ParseError(f"Mismatched {func_name}")

@@ -11,7 +11,7 @@ from ..mathml_tree import MathNode
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import HrefParseNode, ParseNode
+    from ..parse_node import HrefParseNode, ParseNode, UrlParseNode
 
 
 # \href command
@@ -44,12 +44,13 @@ define_function({
 
 
 def _href_handler(context: Dict[str, Any], args: List[Any], is_url_command: bool) -> Dict[str, Any]:
-    """Handler for href and url commands."""
+    r"""Handler for \href and \url commands."""
     parser = context["parser"]
 
     if is_url_command:
         # \url{url} - URL is both link target and displayed text
-        href = assert_node_type(args[0], "url")["url"]
+        url_node = cast("UrlParseNode", assert_node_type(args[0], "url"))
+        href = url_node["url"]
         # Create display text from URL characters
         chars = []
         for c in href:
@@ -69,7 +70,8 @@ def _href_handler(context: Dict[str, Any], args: List[Any], is_url_command: bool
         }
     else:
         # \href{url}{text} - separate URL and display text
-        href = assert_node_type(args[0], "url")["url"]
+        url_node = cast("UrlParseNode", assert_node_type(args[0], "url"))
+        href = url_node["url"]
         body = args[1]
 
     # Security check
@@ -77,7 +79,7 @@ def _href_handler(context: Dict[str, Any], args: List[Any], is_url_command: bool
         "command": "\\href" if not is_url_command else "\\url",
         "url": href,
     }):
-        return parser.format_unsupported_cmd("\\href" if not is_url_command else "\\url")
+        return cast(Dict[str, Any], parser.format_unsupported_cmd("\\href" if not is_url_command else "\\url"))
 
     return {
         "type": "href",
@@ -102,8 +104,5 @@ def _href_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     href_group = cast("HrefParseNode", group)
     math = mml.build_expression_row(href_group["body"], options)
-    if not isinstance(math, MathNode):
-        math = MathNode("mrow", [math])
-
     math.set_attribute("href", href_group["href"])
     return math

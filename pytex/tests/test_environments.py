@@ -1,12 +1,12 @@
 """Tests for KaTeX environment handling."""
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 
 
 class TestArrayEnvironment:
     """Test array environment functionality."""
 
-    def test_array_environment_structure(self):
+    def test_array_environment_structure(self) -> None:
         """Test that array environment has expected structure."""
         try:
             import pytex.environments.array as array_env
@@ -20,7 +20,7 @@ class TestArrayEnvironment:
         except ImportError:
             pytest.skip("Array environment not implemented")
 
-    def test_array_parse_function(self):
+    def test_array_parse_function(self) -> None:
         """Test the parse_array function signature."""
         try:
             from pytex.environments.array import parse_array
@@ -38,10 +38,10 @@ class TestArrayEnvironment:
 class TestMatrixEnvironments:
     """Test matrix environment variations."""
 
-    @pytest.mark.parametrize("matrix_type", [
+    @pytest.mark.parametrize("matrix_type", [  # type: ignore[misc]
         "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix"
     ])
-    def test_matrix_environment_defined(self, matrix_type):
+    def test_matrix_environment_defined(self, matrix_type: str) -> None:
         """Test that matrix environments are defined."""
         # This test will pass when the environments are fully implemented
         try:
@@ -56,10 +56,10 @@ class TestMatrixEnvironments:
 class TestAMS_Environments:
     """Test AMS math environments."""
 
-    @pytest.mark.parametrize("env_name", [
+    @pytest.mark.parametrize("env_name", [  # type: ignore[misc]
         "aligned", "align", "gathered", "alignat", "split"
     ])
-    def test_ams_environment_defined(self, env_name):
+    def test_ams_environment_defined(self, env_name: str) -> None:
         """Test that AMS environments are defined."""
         try:
             import pytex.environments.array as array_env
@@ -71,12 +71,12 @@ class TestAMS_Environments:
 class TestEnvironmentOptions:
     """Test environment configuration options."""
 
-    def test_array_stretch_option(self):
+    def test_array_stretch_option(self) -> None:
         """Test arraystretch configuration."""
         # This would test arraystretch handling when implemented
         assert True  # Placeholder
 
-    def test_column_separation_options(self):
+    def test_column_separation_options(self) -> None:
         """Test column separation configurations."""
         # This would test different column separation types
         assert True  # Placeholder

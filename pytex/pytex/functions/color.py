@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, cast
 from ..build_common import make_fragment
 from ..define_function import define_function, ordargument
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 from ..parse_node import assert_node_type
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ColorParseNode, ParseNode
+    from ..parse_node import ColorParseNode, ColorTokenParseNode, ParseNode
 
 
 def html_builder(group: ParseNode, options: "Options") -> Any:
@@ -39,7 +40,7 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     inner = mml.build_expression(color_group["body"], options.with_color(color_group["color"]))
 
     # Wrap in mstyle with mathcolor attribute
-    node = MathNode("mstyle", inner)
+    node = MathNode("mstyle", cast(List[VirtualNode], inner))
     node.set_attribute("mathcolor", color_group["color"])
 
     return node
@@ -57,7 +58,7 @@ define_function({
     "handler": lambda context, args: {
         "type": "color",
         "mode": context["parser"].mode,
-        "color": assert_node_type(args[0], "color-token")["color"],
+        "color": cast("ColorTokenParseNode", assert_node_type(args[0], "color-token"))["color"],
         "body": ordargument(args[1]),
     },
     "html_builder": html_builder,
@@ -80,8 +81,8 @@ define_function({
 
 
 def _color_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
-    """Handler for \color command."""
-    color = assert_node_type(args[0], "color-token")["color"]
+    r"""Handler for \color command."""
+    color = cast("ColorTokenParseNode", assert_node_type(args[0], "color-token"))["color"]
 
     # Set \current@color macro to store current color
     context["parser"].gullet.macros.set("\\current@color", color)

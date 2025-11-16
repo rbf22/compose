@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 from ..build_common import make_span, make_v_list
 from ..dom_tree import SymbolNode
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 from ..style import Style
 from ..units import make_em
 from ..define_function import define_function_builders
@@ -14,7 +15,11 @@ from ..utils import is_character_box
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode, SupsubParseNode
+    from ..parse_node import OpParseNode, OperatornameParseNode, ParseNode, SupsubParseNode
+
+
+def _is_character_box_node(node: Optional[Any]) -> bool:
+    return isinstance(node, dict) and is_character_box(node)
 
 
 def html_builder_delegate(group: ParseNode, options: "Options") -> Any:
@@ -34,7 +39,7 @@ def html_builder_delegate(group: ParseNode, options: "Options") -> Any:
                    (options.style.size == Style.DISPLAY.size or base.get("limits")))
         return delegate  # Would return operatorname.html_builder if implemented
     elif base.get("type") == "accent":
-        return is_character_box(base.get("base"))  # Would return accent.html_builder
+        return _is_character_box_node(base.get("base"))  # Would return accent.html_builder
     elif base.get("type") == "horizBrace":
         is_sup = not supsub_group.get("sub")
         return is_sup == base.get("isOver")  # Would return horizBrace.html_builder
@@ -64,10 +69,10 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     metrics = options.font_metrics()
 
     # Rule 18a
-    sup_shift = 0
-    sub_shift = 0
+    sup_shift = 0.0
+    sub_shift = 0.0
 
-    is_character_box_base = value_base and is_character_box(value_base)
+    is_character_box_base = _is_character_box_node(value_base)
 
     if value_sup:
         new_options = options.having_style(options.style.sup())
@@ -98,12 +103,22 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     margin_left = None
     if subm:
         # Handle italic correction for subscripts
-        is_oiint = (supsub_group.get("base") and
-                   supsub_group["base"].get("type") == "op" and
-                   supsub_group["base"].get("name") and
-                   supsub_group["base"]["name"] in ("\\oiint", "\\oiiint"))
-        if isinstance(base, SymbolNode) or is_oiint:
-            margin_left = make_em(-base.italic)
+        base_node = supsub_group.get("base")
+        is_oiint = (
+            isinstance(base_node, dict)
+            and base_node.get("type") == "op"
+            and bool(base_node.get("name"))
+            and base_node.get("name") in ("\\oiint", "\\oiiint")
+        )
+        italic_corr = 0.0
+        if isinstance(base, SymbolNode):
+            italic_corr = base.italic
+        elif is_oiint:
+            # Integral-with-circle symbols get a small italic correction in KaTeX;
+            # we approximate with zero here for layout simplicity.
+            italic_corr = 0.0
+        if italic_corr:
+            margin_left = make_em(-italic_corr)
 
     if supm and subm:
         # Both superscript and subscript
@@ -178,29 +193,40 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     is_over = None
     is_sup = None
 
-    if supsub_group.get("base") and supsub_group["base"].get("type") == "horizBrace":
+    base_node = supsub_group.get("base")
+    base_dict = cast(Optional[dict], base_node) if isinstance(base_node, dict) else None
+
+    if base_dict and base_dict.get("type") == "horizBrace":
         is_sup = bool(supsub_group.get("sup"))
-        if is_sup == supsub_group["base"].get("isOver"):
+        if is_sup == base_dict.get("isOver"):
             is_brace = True
-            is_over = supsub_group["base"]["isOver"]
+            is_over = base_dict.get("isOver")
 
     # Mark parent relationship
-    if supsub_group.get("base") and supsub_group["base"].get("type") in ("op", "operatorname"):
-        supsub_group["base"]["parentIsSupSub"] = True
+    if base_dict and base_dict.get("type") == "op":
+        base_op = cast("OpParseNode", base_dict)
+        base_op["parentIsSupSub"] = True
+    elif base_dict and base_dict.get("type") == "operatorname":
+        op_name_node = cast("OperatornameParseNode", base_dict)
+        op_name_node["parentIsSupSub"] = True
 
-    children = [mml.build_group(supsub_group["base"], options)]
+    children: List[VirtualNode] = []
+    if base_node is not None:
+        children.append(mml.build_group(base_node, options))
 
-    if supsub_group.get("sub"):
-        children.append(mml.build_group(supsub_group["sub"], options))
+    sub_node = supsub_group.get("sub")
+    if sub_node is not None:
+        children.append(mml.build_group(sub_node, options))
 
-    if supsub_group.get("sup"):
-        children.append(mml.build_group(supsub_group["sup"], options))
+    sup_node = supsub_group.get("sup")
+    if sup_node is not None:
+        children.append(mml.build_group(sup_node, options))
 
     # Determine MathML node type
     if is_brace:
         node_type = "mover" if is_over else "munder"
-    elif not supsub_group.get("sub"):
-        base = supsub_group.get("base")
+    elif sup_node is None:
+        base = base_dict
         if (base and base.get("type") == "op" and base.get("limits") and
             (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
             node_type = "mover"
@@ -210,8 +236,8 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
             node_type = "mover"
         else:
             node_type = "msup"
-    elif not supsub_group.get("sup"):
-        base = supsub_group.get("base")
+    elif sub_node is None:
+        base = base_dict
         if (base and base.get("type") == "op" and base.get("limits") and
             (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
             node_type = "munder"
@@ -222,13 +248,13 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
         else:
             node_type = "msub"
     else:
-        base = supsub_group.get("base")
+        base = base_dict
         if (base and base.get("type") == "op" and base.get("limits") and
             options.style == Style.DISPLAY):
             node_type = "munderover"
         elif (base and base.get("type") == "operatorname" and
               base.get("alwaysHandleSupSub") and
-              (options.style == Style.DISPLAY or base.get("limits"))):
+              (base.get("limits") or options.style == Style.DISPLAY)):
             node_type = "munderover"
         else:
             node_type = "msubsup"

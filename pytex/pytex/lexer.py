@@ -43,6 +43,8 @@ class Lexer:
         self.input = input_
         self.settings = settings
         self.token_regex = re.compile(TOKEN_REGEX_STRING, re.MULTILINE)
+        # Track current position explicitly; Pattern.lastindex is not available.
+        self._pos = 0
         # Category codes. The lexer only supports comment characters (14) for now.
         # MacroExpander additionally distinguishes active (13).
         self.catcodes: Dict[str, int] = {
@@ -57,7 +59,7 @@ class Lexer:
     def lex(self) -> Token:
         """Lex a single token."""
         input_ = self.input
-        pos = self.token_regex.lastindex or 0
+        pos = self._pos
 
         if pos == len(input_):
             return Token("EOF", SourceLocation(self, pos, pos))
@@ -81,19 +83,21 @@ class Lexer:
             text = " "
 
         if self.catcodes.get(text) == 14:  # comment character
-            nl_index = input_.find('\n', self.token_regex.lastindex or 0)
+            nl_index = input_.find('\n', match.end())
             if nl_index == -1:
-                self.token_regex.lastindex = len(input_)  # EOF
+                self._pos = len(input_)  # EOF
                 self.settings.report_nonstrict(
                     "commentAtEnd",
                     "% comment has no terminating newline; LaTeX would "
                     "fail because of commenting the end of math mode (e.g. $)"
                 )
             else:
-                self.token_regex.lastindex = nl_index + 1
+                self._pos = nl_index + 1
             return self.lex()
 
-        return Token(text, SourceLocation(self, pos, self.token_regex.lastindex or 0))
+        # Advance position to end of this match
+        self._pos = match.end()
+        return Token(text, SourceLocation(self, pos, self._pos))
 
 
 __all__ = ["Lexer", "COMBINING_DIACRITICAL_MARKS_END_REGEX"]

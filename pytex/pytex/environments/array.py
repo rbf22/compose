@@ -2,22 +2,79 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Union, Dict, Any, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+    cast,
+)
 
+from ..tree import DocumentFragment, VirtualNode
 from ..build_common import make_fragment, make_line_span, make_span, make_v_list
+from ..dom_tree import DomNode
 from ..define_environment import define_environment
 from ..mathml_tree import MathNode
 from ..parse_error import ParseError
-from ..parse_node import assert_node_type, assert_symbol_node_type, check_symbol_node_type
+from ..parse_node import AnyParseNode, ArrayParseNode, assert_node_type, assert_symbol_node_type, check_symbol_node_type
 from ..style import Style
 from ..token import Token
-from ..units import calculate_size, make_em
+from ..types import BreakToken
+from ..units import Measurement, calculate_size, make_em
 from ..utils import deflt
 
 if TYPE_CHECKING:
     from ..parser import Parser
-    from ..parse_node import ParseNode, OrdgroupParseNode, AccentTokenParseNode
+    from ..parse_node import ParseNode, OrdgroupParseNode
     from ..options import Options
+
+
+class CellNode(TypedDict):
+    """Minimal representation of a cell parse node."""
+
+    type: str
+    mode: str
+    body: List[Any]
+
+
+class StylingNode(TypedDict):
+    type: Literal["styling"]
+    mode: str
+    style: str
+    body: List[CellNode]
+
+
+RowCell = Union[CellNode, StylingNode]
+
+
+class TagEntry(TypedDict, total=False):
+    auto: bool
+    body: List[Any]
+
+
+class RowLayoutEntry(TypedDict):
+    elements: List[DomNode]
+    height: float
+    depth: float
+    pos: float
+
+
+class ColumnDescription(TypedDict, total=False):
+    type: Literal["align", "separator"]
+    align: str
+    pregap: float
+    postgap: float
+    separator: str
+
+
+Row = List[RowCell]
+TagValue = Union[bool, List[AnyParseNode]]
+SizeGroup = Dict[str, Measurement]
 
 # Type definitions
 AlignSpec = Union[
@@ -28,8 +85,8 @@ AlignSpec = Union[
 ColSeparationType = str  # "align" | "alignat" | "gather" | "small" | "CD"
 
 
-def get_hlines(parser: Parser) -> List[bool]:
-    """Get horizontal lines (\hline, \hdashline) info."""
+def get_hlines(parser: "Parser") -> List[bool]:
+    r"""Get horizontal lines (\hline, \hdashline) info."""
     hline_info = []
     parser.consume_spaces()
 
@@ -48,7 +105,7 @@ def get_hlines(parser: Parser) -> List[bool]:
     return hline_info
 
 
-def validate_ams_environment_context(context) -> None:
+def validate_ams_environment_context(context: Dict[str, Any]) -> None:
     """Validate that AMS environments are used in display mode."""
     settings = context["parser"].settings
     if not settings.display_mode:
@@ -68,7 +125,7 @@ def d_cell_style(env_name: str) -> str:
 
 
 def parse_array(
-    parser: Parser,
+    parser: "Parser",
     config: Dict[str, Any],
     style: str,
 ) -> ParseNode:
@@ -91,47 +148,52 @@ def parse_array(
 
     parser.gullet.begin_group()
 
-    row = []
-    body = [row]
-    row_gaps = []
-    h_lines_before_row = []
+    row: Row = []
+    body: List[Row] = [row]
+    row_gaps: List[Optional[Measurement]] = []
+    h_lines_before_row: List[List[bool]] = []
 
-    tags = [] if config.get("autoTag") is not None else None
+    tags: Optional[List[TagValue]] = [] if config.get("autoTag") is not None else None
 
-    def begin_row():
+    def begin_row() -> None:
         if config.get("autoTag"):
             parser.gullet.macros.set("\\@eqnsw", "1", True)
 
-    def end_row():
+    def end_row() -> None:
         if tags is not None:
             if parser.gullet.macros.get("\\df@tag"):
                 tags.append(parser.subparse([Token("\\df@tag")]))
                 parser.gullet.macros.set("\\df@tag", None, True)
             else:
-                tags.append(bool(config.get("autoTag")) and
-                          parser.gullet.macros.get("\\@eqnsw") == "1")
+                tags.append(
+                    bool(config.get("autoTag"))
+                    and parser.gullet.macros.get("\\@eqnsw") == "1"
+                )
 
     begin_row()
     h_lines_before_row.append(get_hlines(parser))
 
     while True:
         # Parse each cell in its own group (namespace)
-        cell = parser.parse_expression(False, "\\end" if config.get("singleRow") else "\\\\")
+        break_token = BreakToken.END if config.get("singleRow") else BreakToken.DOUBLE_BACKSLASH
+        cell_body = parser.parse_expression(False, break_token)
         parser.gullet.end_group()
         parser.gullet.begin_group()
 
-        cell = {
+        base_cell: CellNode = {
             "type": "ordgroup",
             "mode": parser.mode,
-            "body": cell,
+            "body": cell_body,
         }
         if style:
-            cell = {
+            cell: RowCell = {
                 "type": "styling",
                 "mode": parser.mode,
                 "style": style,
-                "body": [cell],
+                "body": [base_cell],
             }
+        else:
+            cell = base_cell
         row.append(cell)
 
         next_token = parser.fetch().text
@@ -159,8 +221,12 @@ def parse_array(
         elif next_token == "\\\\":
             parser.consume()
             # Parse optional size argument [size]
-            size = parser.parse_size_group(True) if parser.gullet.future().text != " " else None
-            row_gaps.append(size["value"] if size else None)
+            size_group: Optional[SizeGroup] = (
+                parser.parse_size_group(True)
+                if parser.gullet.future().text != " "
+                else None
+            )
+            row_gaps.append(size_group.get("value") if size_group else None)
             end_row()
 
             # Check for \hline(s) following the row separator
@@ -174,7 +240,10 @@ def parse_array(
     parser.gullet.end_group()
     parser.gullet.end_group()
 
-    return {
+    while len(row_gaps) < len(body):
+        row_gaps.append(None)
+
+    array_node: Dict[str, Any] = {
         "type": "array",
         "mode": parser.mode,
         "addJot": config.get("addJot"),
@@ -189,23 +258,26 @@ def parse_array(
         "leqno": config.get("leqno"),
     }
 
+    return cast(ParseNode, array_node)
 
-def html_builder(group: ParseNode, options: Options) -> Any:
+
+def html_builder(group: ParseNode, options: Options) -> DomNode | DocumentFragment:
     """Build HTML for array environments."""
     from .. import build_html as html
     from ..parse_node import ArrayParseNode
-    from typing import cast
 
     array_group = cast(ArrayParseNode, group)
 
     nr = len(array_group["body"])
-    h_lines_before_row = array_group["hLinesBeforeRow"]
+    h_lines_before_row: List[List[bool]] = array_group.get("hLinesBeforeRow", [])
+    hlines: List[Dict[str, float | bool]] = []
+    row_layout: List[RowLayoutEntry] = []
     nc = 0
-    body = [None] * nr
-    hlines = []
 
-    rule_thickness = max(options.font_metrics().get("arrayRuleWidth", 0.04),
-                        options.min_rule_thickness)
+    rule_thickness = max(
+        options.font_metrics().get("arrayRuleWidth", 0.04),
+        options.min_rule_thickness,
+    )
 
     # Horizontal spacing
     pt = 1 / options.font_metrics().get("ptPerEm", 10)
@@ -216,68 +288,82 @@ def html_builder(group: ParseNode, options: Options) -> Any:
         arraycolsep = 0.2778 * (local_multiplier / options.size_multiplier)
 
     # Vertical spacing
-    baselineskip = calculate_size({"number": 3, "unit": "ex"}, options) \
-                   if array_group.get("colSeparationType") == "CD" else 12 * pt
+    baselineskip = (
+        calculate_size({"number": 3, "unit": "ex"}, options)
+        if array_group.get("colSeparationType") == "CD"
+        else 12 * pt
+    )
     jot = 3 * pt
     arrayskip = array_group.get("arraystretch", 1) * baselineskip
     arstrut_height = 0.7 * arrayskip
     arstrut_depth = 0.3 * arrayskip
 
-    total_height = 0
+    total_height = 0.0
 
-    def set_hline_pos(hlines_in_gap: List[bool]):
+    def set_hline_pos(hlines_in_gap: List[bool]) -> None:
         nonlocal total_height
         for i, is_dashed in enumerate(hlines_in_gap):
             if i > 0:
                 total_height += 0.25
             hlines.append({"pos": total_height, "isDashed": is_dashed})
 
-    set_hline_pos(h_lines_before_row[0])
+    if h_lines_before_row:
+        set_hline_pos(h_lines_before_row[0])
+
+    row_gaps = cast(Sequence[Optional[Measurement]], array_group.get("rowGaps", []))
 
     for r in range(nr):
         inrow = array_group["body"][r]
         height = arstrut_height
         depth = arstrut_depth
 
-        if nc < len(inrow):
-            nc = len(inrow)
+        nc = max(nc, len(inrow))
 
-        outrow = [None] * len(inrow)
-        for c, elt in enumerate(inrow):
-            outrow[c] = html.build_group(elt, options)
-            depth = max(depth, outrow[c].depth)
-            height = max(height, outrow[c].height)
+        built_cells: List[DomNode] = []
+        for elt in inrow:
+            node = html.build_group(elt, options)
+            built_cells.append(node)
+            depth = max(depth, node.depth)
+            height = max(height, node.height)
 
-        row_gap = array_group.get("rowGaps", [None])[r]
-        gap = 0
+        row_gap = row_gaps[r] if r < len(row_gaps) else None
+        gap = 0.0
         if row_gap:
             gap = calculate_size(row_gap, options)
             if gap > 0:
                 gap += arstrut_depth
-                if depth < gap:
-                    depth = gap
-                gap = 0
+                depth = max(depth, gap)
+                gap = 0.0
 
         if array_group.get("addJot"):
             depth += jot
 
-        outrow.extend([height, depth, total_height + height])
-        total_height += height + depth + gap
-        body[r] = outrow
+        row_pos = total_height + height
+        row_layout.append(
+            {
+                "elements": built_cells,
+                "height": height,
+                "depth": depth,
+                "pos": row_pos,
+            }
+        )
 
-        set_hline_pos(h_lines_before_row[r + 1])
+        total_height += height + depth + gap
+
+        if r + 1 < len(h_lines_before_row):
+            set_hline_pos(h_lines_before_row[r + 1])
 
     offset = total_height / 2 + options.font_metrics().get("axisHeight", 0)
-    col_descriptions = array_group.get("cols", [])
+    col_descriptions: Sequence[ColumnDescription] = array_group.get("cols", []) or []
 
     # Build columns with spacing and alignment
-    cols = []
-    col_sep = None
+    cols: List[DomNode] = []
 
     for c, col_descr in enumerate(col_descriptions):
         if col_descr.get("type") == "separator":
-            if col_descr.get("separator") in "|:":
-                line_type = "solid" if col_descr["separator"] == "|" else "dashed"
+            sep_val = col_descr.get("separator")
+            if sep_val is not None and sep_val in "|:":
+                line_type = "solid" if sep_val == "|" else "dashed"
                 separator = make_span(["vertical-separator"], [], options)
                 separator.style["height"] = make_em(total_height)
                 separator.style["borderRightWidth"] = make_em(rule_thickness)
@@ -296,19 +382,21 @@ def html_builder(group: ParseNode, options: Options) -> Any:
                     col_sep.style["width"] = make_em(sepwidth)
                     cols.append(col_sep)
 
-            col = []
+            col_nodes: List[Dict[str, Any]] = []
             for r in range(nr):
-                row = body[r]
-                elem = row[c]
-                if elem:
-                    shift = row[-1] - offset  # pos - offset
-                    elem.depth = row[-2]  # depth
-                    elem.height = row[-3]  # height
-                    col.append({"type": "elem", "elem": elem, "shift": shift})
+                row_meta = row_layout[r]
+                elements = row_meta["elements"]
+                if c >= len(elements):
+                    continue
+                elem = elements[c]
+                shift = row_meta["pos"] - offset
+                elem.depth = row_meta["depth"]
+                elem.height = row_meta["height"]
+                col_nodes.append({"type": "elem", "elem": elem, "shift": shift})
 
             col_vlist = make_v_list({
                 "positionType": "individualShift",
-                "children": col,
+                "children": col_nodes,
             }, options)
             col_vlist = make_span([f"col-align-{col_descr.get('align', 'c')}"], [col_vlist])
             cols.append(col_vlist)
@@ -338,25 +426,29 @@ def html_builder(group: ParseNode, options: Options) -> Any:
             "children": v_list_elems,
         }, options)
 
-    if array_group.get("tags") and any(array_group["tags"]):
+    tags: Optional[List[TagValue]] = array_group.get("tags")
+    if tags and any(tag is not False for tag in tags):
         # An environment with manual tags and/or automatic equation numbers.
         # Create node(s), the latter of which trigger CSS counter increment.
         tag_spans = []
         for r in range(nr):
-            rw = body[r]
-            shift = rw.pos - offset
-            tag = array_group["tags"][r]
-            tag_span = None
-            if tag is True:  # automatic numbering
+            rw = row_layout[r]
+            shift = rw["pos"] - offset
+            tag_value = tags[r]
+            if tag_value is True:  # automatic numbering
                 tag_span = make_span(["eqn-num"], [], options)
-            elif tag is False:
+            elif tag_value is False:
                 # \nonumber/\notag or starred environment
                 tag_span = make_span([], [], options)
-            else:  # manual \tag
-                tag_span = make_span([],
-                    html.build_expression(tag, options, True), options)
-            tag_span.depth = rw.depth
-            tag_span.height = rw.height
+            elif isinstance(tag_value, list):
+                # manual \tag
+                tag_span = make_span(
+                    [],
+                    html.build_expression(tag_value, options, True),
+                    options,
+                )
+            tag_span.depth = rw["depth"]
+            tag_span.height = rw["height"]
             tag_spans.append({"type": "elem", "elem": tag_span, "shift": shift})
 
         eqn_num_col = make_v_list({
@@ -373,40 +465,47 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for array environments."""
     from .. import build_mathml as mml
     from ..parse_node import ArrayParseNode
-    from typing import cast
 
     array_group = cast(ArrayParseNode, group)
 
-    tbl = []
-    glue = MathNode("mtd", [], ["mtr-glue"])
-    tag = MathNode("mtd", [], ["mml-eqn-num"])
+    tbl: List[MathNode] = []
+    glue = MathNode("mtd", cast(List[VirtualNode], []), ["mtr-glue"])
+    tag_cell = MathNode("mtd", cast(List[VirtualNode], []), ["mml-eqn-num"])
+
+    tags: Optional[List[TagValue]] = array_group.get("tags")
 
     for i, rw in enumerate(array_group["body"]):
-        row = []
-        for j, cell in enumerate(rw):
-            row.append(MathNode("mtd", [mml.build_group(cell, options)]))
+        row_cells: List[MathNode] = []
+        for cell in rw:
+            row_cells.append(MathNode("mtd", cast(List[VirtualNode], [mml.build_group(cell, options)])))
 
-        if array_group.get("tags") and array_group["tags"][i]:
-            row.insert(0, glue)
-            row.append(glue)
+        tag_value: Optional[TagValue] = None
+        if tags and i < len(tags):
+            tag_value = tags[i]
+
+        if tag_value:
+            row_cells.insert(0, glue)
+            row_cells.append(glue)
             if array_group.get("leqno"):
-                row.insert(0, tag)
+                row_cells.insert(0, tag_cell)
             else:
-                row.append(tag)
+                row_cells.append(tag_cell)
 
-        tbl.append(MathNode("mtr", row))
+        tbl.append(MathNode("mtr", cast(List[VirtualNode], row_cells)))
 
-    table = MathNode("mtable", tbl)
+    table = MathNode("mtable", cast(List[VirtualNode], tbl))
 
     # Set row spacing
     arraystretch = array_group.get("arraystretch", 1)
-    gap = (0.1 if arraystretch == 0.5  # smallmatrix, subarray
-           else 0.16 + arraystretch - 1 + (0.09 if array_group.get("addJot") else 0))
+    gap = (
+        0.1 if arraystretch == 0.5  # smallmatrix, subarray
+        else 0.16 + arraystretch - 1 + (0.09 if array_group.get("addJot") else 0)
+    )
     table.set_attribute("rowspacing", make_em(gap))
 
     # Set column alignment and lines
     if array_group.get("cols"):
-        cols = array_group["cols"]
+        cols = array_group.get("cols") or []
         align = ""
         column_lines = ""
         prev_type_was_align = False
@@ -430,7 +529,7 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     col_sep_type = array_group.get("colSeparationType")
     if col_sep_type == "align":
         spacing = ""
-        cols = array_group.get("cols", [])
+        cols = array_group.get("cols") or []
         for i in range(1, len(cols)):
             spacing += "0em " if i % 2 else "1em "
         table.set_attribute("columnspacing", spacing.rstrip())
@@ -456,10 +555,10 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     if any(c in row_lines for c in "sd"):
         table.set_attribute("rowlines", row_lines.rstrip())
 
-    # Handler functions (defined before usage)
+    return table
 
 
-def _array_handler(context, args, is_darray) -> ParseNode:
+def _array_handler(context: Dict[str, Any], args: List[ParseNode], is_darray: bool) -> ParseNode:
     """Handler for array and darray environments."""
     from ..parse_node import assert_node_type
 
@@ -467,12 +566,12 @@ def _array_handler(context, args, is_darray) -> ParseNode:
     colalign = ([args[0]] if sym_node else
                 cast("OrdgroupParseNode", assert_node_type(args[0], "ordgroup"))["body"])
 
-    cols = []
+    cols: List[AlignSpec] = []
     for nde in colalign:
         node = assert_symbol_node_type(nde)
         if node is None:
             raise ParseError("Expected symbol node", nde)
-        ca = cast("AccentTokenParseNode", node)["text"]
+        ca = node["text"]
         if ca in "lcr":
             cols.append({"type": "align", "align": ca})
         elif ca == "|":
@@ -490,7 +589,7 @@ def _array_handler(context, args, is_darray) -> ParseNode:
     }, style)
 
 
-def _matrix_handler(context) -> ParseNode:
+def _matrix_handler(context: Dict[str, Any]) -> ParseNode:
     """Handler for matrix environments."""
     env_name = context["envName"]
     base_name = env_name.replace("*", "")
@@ -526,14 +625,14 @@ def _matrix_handler(context) -> ParseNode:
             parser.consume()
             payload["cols"] = [{"type": "align", "align": col_align}]
 
-    res = parse_array(context["parser"], payload, d_cell_style(env_name))
+    res = cast(ArrayParseNode, parse_array(context["parser"], payload, d_cell_style(env_name)))
 
     # Populate cols with correct number
     num_cols = max((len(row) for row in res["body"]), default=0)
     res["cols"] = [{"type": "align", "align": col_align}] * num_cols
 
     if delimiters:
-        return {
+        leftright_node: Dict[str, Any] = {
             "type": "leftright",
             "mode": context["mode"],
             "body": [res],
@@ -541,11 +640,11 @@ def _matrix_handler(context) -> ParseNode:
             "right": delimiters[1],
             "rightColor": None,
         }
-    else:
-        return res
+        return cast(ParseNode, leftright_node)
+    return res
 
 
-def _aligned_handler(context) -> ParseNode:
+def _aligned_handler(context: Dict[str, Any]) -> ParseNode:
     """Handler for AMS math environments (aligned, align, gathered, alignat, split)."""
     env_name = context["envName"]
 
@@ -555,18 +654,25 @@ def _aligned_handler(context) -> ParseNode:
     separation_type = "alignat" if "at" in env_name else "align"
     is_split = env_name == "split"
 
-    res = parse_array(context["parser"], {
-        "cols": cols,
-        "addJot": True,
-        "autoTag": None if is_split else get_auto_tag(env_name),
-        "emptySingleRow": True,
-        "colSeparationType": separation_type,
-        "maxNumCols": 2 if is_split else None,
-        "leqno": context["parser"].settings.leqno,
-    }, "display")
+    res = cast(
+        ArrayParseNode,
+        parse_array(
+            context["parser"],
+            {
+                "cols": cols,
+                "addJot": True,
+                "autoTag": None if is_split else get_auto_tag(env_name),
+                "emptySingleRow": True,
+                "colSeparationType": separation_type,
+                "maxNumCols": 2 if is_split else None,
+                "leqno": context["parser"].settings.leqno,
+            },
+            "display",
+        ),
+    )
 
     # Determining number of columns
-    num_maths = None
+    num_maths: Optional[int] = None
     num_cols = 0
     empty_group = {
         "type": "ordgroup",
@@ -583,25 +689,31 @@ def _aligned_handler(context) -> ParseNode:
     is_aligned = num_cols == 0
 
     # Process each row to add empty groups for binary operators
-    for row in res["body"]:
-        for i in range(1, len(row), 2):
-            if i < len(row):
-                styling = row[i]
+    for row_any in res["body"]:
+        row_cells = cast(List[Dict[str, Any]], row_any)
+        for i in range(1, len(row_cells), 2):
+            if i < len(row_cells):
+                styling = row_cells[i]
                 if styling.get("type") == "styling":
-                    ordgroup = styling["body"][0]
+                    body_list = cast(List[Dict[str, Any]], styling.get("body", []))
+                    if not body_list:
+                        continue
+                    ordgroup = body_list[0]
                     if ordgroup.get("type") == "ordgroup":
-                        ordgroup["body"].insert(0, empty_group)
+                        og_body = cast(List[Any], ordgroup.get("body", []))
+                        og_body.insert(0, empty_group)
+                        ordgroup["body"] = og_body
 
         # Count columns
         if not is_aligned:
-            if num_maths and len(row) // 2 > num_maths:
+            if num_maths is not None and len(row_cells) // 2 > num_maths:
                 raise ParseError(
-                    f"Too many math in a row: expected {num_maths}, but got {len(row) // 2}",
-                    row[0] if row else None
+                    f"Too many math in a row: expected {num_maths}, but got {len(row_cells) // 2}",
+                    row_cells[0] if row_cells else None,
                 )
         else:
-            if num_cols < len(row):
-                num_cols = len(row)
+            if num_cols < len(row_cells):
+                num_cols = len(row_cells)
 
     # Adjust alignment
     if is_aligned:
@@ -622,18 +734,18 @@ def _aligned_handler(context) -> ParseNode:
     return res
 
 
-def _subarray_handler(context, args) -> ParseNode:
+def _subarray_handler(context: Dict[str, Any], args: List[ParseNode]) -> ParseNode:
     """Handler for subarray environment."""
     # Parse column alignment argument
     sym_node = check_symbol_node_type(args[0])
     colalign = [args[0]] if sym_node else cast("OrdgroupParseNode", assert_node_type(args[0], "ordgroup"))["body"]
 
-    cols = []
+    cols: List[AlignSpec] = []
     for nde in colalign:
         node = assert_symbol_node_type(nde)
         if node is None:
             raise ParseError("Expected symbol node", nde)
-        ca = cast("AccentTokenParseNode", node)["text"]
+        ca = node["text"]
         if ca in "lcr":
             cols.append({"type": "align", "align": ca})
         else:

@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from .macro_expander import MacroExpander
 from .parse_error import ParseError
 from .settings import Settings
 from .source_location import SourceLocation
 from .token import Token
-from .types import ArgType, BreakToken, Mode
+from .types import Mode
 from .unicode_sup_or_sub import UNICODE_SUB_REGEX, U_SUBS_AND_SUPS
 
-# Placeholder imports - will be filled in
-try:
-    from .functions import functions as FUNCTIONS
-except ImportError:
-    FUNCTIONS = {}
+# Functions map from define_function, treated here as a dict-like spec
+from .define_function import FUNCTIONS as _FUNCTIONS
+FUNCTIONS: Dict[str, Dict[str, Any]] = cast(Dict[str, Dict[str, Any]], _FUNCTIONS)
 
 try:
     from .symbols_data import symbols as SYMBOLS
@@ -36,7 +34,7 @@ class Parser:
 
     def __init__(self, input_: str, settings: Settings):
         # Start in math mode
-        self.mode: Mode = "math"
+        self.mode: Mode = Mode.MATH
         # Create a new macro expander
         self.gullet = MacroExpander(input_, settings, self.mode)
         # Store the settings for use in parsing
@@ -71,13 +69,14 @@ class Parser:
 
     def parse(self) -> List[Any]:
         """Main parsing function, which parses an entire input."""
-        if not self.settings.global_group:
+        if not self.settings.globalGroup:
             # Create a group namespace for the math expression
             self.gullet.begin_group()
 
         # Use old \color behavior (same as LaTeX's \textcolor) if requested
-        if self.settings.color_is_text_color:
-            self.gullet.macros["\\color"] = "\\textcolor"
+        if self.settings.colorIsTextColor:
+            # Install alias in the macro namespace
+            self.gullet.macros.set("\\color", "\\textcolor", global_=True)
 
         try:
             # Try to parse the input
@@ -87,7 +86,7 @@ class Parser:
             self.expect("EOF")
 
             # End the group namespace for the expression
-            if not self.settings.global_group:
+            if not self.settings.globalGroup:
                 self.gullet.end_group()
 
             return parse
@@ -118,7 +117,7 @@ class Parser:
     def parse_expression(
         self,
         break_on_infix: bool,
-        break_on_token_text: Optional[BreakToken] = None,
+        break_on_token_text: Optional[str] = None,
     ) -> List[Any]:
         """Parses an 'expression', a list of atoms."""
         body = []
@@ -132,7 +131,8 @@ class Parser:
                 break
             if break_on_token_text and lex.text == break_on_token_text:
                 break
-            if break_on_infix and FUNCTIONS.get(lex.text, {}).get("infix"):
+            func_spec = FUNCTIONS.get(lex.text)
+            if break_on_infix and func_spec and func_spec.get("infix"):
                 break
             atom = self.parse_atom(break_on_token_text)
             if atom is None:
@@ -210,13 +210,13 @@ class Parser:
         color_node = {
             "type": "color",
             "mode": self.mode,
-            "color": self.settings.error_color,
+            "color": self.settings.errorColor,
             "body": [text_node],
         }
 
         return color_node
 
-    def parse_atom(self, break_on_token_text: Optional[BreakToken] = None) -> Optional[Any]:
+    def parse_atom(self, break_on_token_text: Optional[str] = None) -> Optional[Any]:
         """Parses a group with optional super/subscripts."""
         # The body of an atom is an implicit group
         base = self.parse_group("atom", break_on_token_text)
@@ -319,7 +319,7 @@ class Parser:
 
     def parse_function(
         self,
-        break_on_token_text: Optional[BreakToken] = None,
+        break_on_token_text: Optional[str] = None,
         name: Optional[str] = None,
     ) -> Optional[Any]:
         """Parses an entire function, including its base and all arguments."""
@@ -349,7 +349,7 @@ class Parser:
         args: List[Any],
         opt_args: List[Optional[Any]],
         token: Optional[Token] = None,
-        break_on_token_text: Optional[BreakToken] = None,
+        break_on_token_text: Optional[str] = None,
     ) -> Any:
         """Call a function handler with suitable context."""
         context = {
@@ -360,7 +360,8 @@ class Parser:
         }
         func = FUNCTIONS.get(name)
         if func and func.get("handler"):
-            return func["handler"](context, args, opt_args)
+            handler = func["handler"]
+            return handler(context, args, opt_args)
         else:
             raise ParseError(f"No function handler for {name}")
 
@@ -372,8 +373,8 @@ class Parser:
         if total_args == 0:
             return [], []
 
-        args = []
-        opt_args = []
+        args: List[Any] = []
+        opt_args: List[Optional[Any]] = []
 
         for i in range(total_args):
             arg_types = func_data.get("argTypes", [])
@@ -399,7 +400,7 @@ class Parser:
     def parse_group_of_type(
         self,
         name: str,
-        type_: Optional[ArgType],
+        type_: Optional[str],
         optional: bool,
     ) -> Optional[Any]:
         """Parses a group when the mode is changing."""
@@ -409,11 +410,13 @@ class Parser:
             return self.parse_size_group(optional)
         elif type_ == "url":
             return self.parse_url_group(optional)
-        elif type_ in ("math", "text"):
-            return self.parse_argument_group(optional, type_)
+        elif type_ == "math":
+            return self.parse_argument_group(optional, Mode.MATH)
+        elif type_ == "text":
+            return self.parse_argument_group(optional, Mode.TEXT)
         elif type_ == "hbox":
             # hbox argument type wraps the argument in the equivalent of \hbox
-            group = self.parse_argument_group(optional, "text")
+            group = self.parse_argument_group(optional, Mode.TEXT)
             if group is not None:
                 return {
                     "type": "styling",
@@ -449,7 +452,7 @@ class Parser:
             self.consume()
 
     def parse_string_group(
-        self, mode_name: ArgType, optional: bool
+        self, mode_name: str, optional: bool
     ) -> Optional[Token]:
         """Parses a group, returning the string formed by brace-enclosed tokens."""
         arg_token = self.gullet.scan_argument(optional)
@@ -513,7 +516,7 @@ class Parser:
     def parse_group(
         self,
         name: str,
-        break_on_token_text: Optional[BreakToken] = None,
+        break_on_token_text: Optional[str] = None,
     ) -> Optional[Any]:
         """Parses an ordinary group."""
         first_token = self.fetch()
@@ -544,7 +547,7 @@ class Parser:
             # Otherwise, just return a nucleus
             result = self.parse_function(break_on_token_text, name) or self.parse_symbol()
             if result is None and text.startswith("\\") and text not in IMPLICIT_COMMANDS:
-                if self.settings.throw_on_error:
+                if self.settings.throwOnError:
                     raise ParseError(f"Undefined control sequence: {text}", first_token)
                 result = self.format_unsupported_cmd(text)
                 self.consume()

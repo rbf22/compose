@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..build_common import make_span
 from ..define_function import define_function, ordargument
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 from ..utils import is_character_box
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import AnyParseNode, MclassParseNode, ParseNode
+    from ..parse_node import AnyParseNode, AtomParseNode, MclassParseNode, ParseNode
 
 
 def html_builder(group: ParseNode, options: "Options") -> Any:
@@ -31,20 +32,20 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     inner = mml.build_expression(mclass_group["body"], options)
 
     if mclass_group["mclass"] == "minner":
-        node = MathNode("mpadded", inner)
+        node = MathNode("mpadded", cast(List[VirtualNode], inner))
     elif mclass_group["mclass"] == "mord":
         if mclass_group.get("isCharacterBox"):
             node = inner[0]
             node.type = "mi"
         else:
-            node = MathNode("mi", inner)
+            node = MathNode("mi", cast(List[VirtualNode], inner))
     else:
         # mbin, mrel, mopen, mclose, mpunct
         if mclass_group.get("isCharacterBox"):
             node = inner[0]
             node.type = "mo"
         else:
-            node = MathNode("mo", inner)
+            node = MathNode("mo", cast(List[VirtualNode], inner))
 
         # Set spacing attributes based on math class
         if mclass_group["mclass"] == "mbin":
@@ -63,16 +64,25 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     return node
 
 
+def _first_body_atom(arg: AnyParseNode) -> AnyParseNode:
+    """Return the first atom inside an ordgroup or the node itself."""
+    body = arg.get("body")
+    if isinstance(body, list) and body:
+        return cast(AnyParseNode, body[0])
+    return arg
+
+
 def binrel_class(arg: AnyParseNode) -> str:
     """Determine math class for binrel operations."""
-    # Get the atom from ordgroup or directly
-    atom = arg["body"][0] if (arg.get("type") == "ordgroup" and arg.get("body")) else arg
+    atom = _first_body_atom(arg)
 
-    if (atom.get("type") == "atom" and
-        atom.get("family") in ("bin", "rel")):
-        return f"m{atom['family']}"
-    else:
-        return "mord"
+    if atom.get("type") == "atom":
+        atom_node = cast("AtomParseNode", atom)
+        family = atom_node.get("family")
+        if family in ("bin", "rel"):
+            return f"m{family}"
+
+    return "mord"
 
 
 # Math class commands
@@ -127,9 +137,8 @@ define_function({
     "mathml_builder": mathml_builder,
 })
 
-
-def _stacked_handler(context, args):
-    """Handler for stacked operators like \\stackrel, \\overset, \\underset."""
+def _stacked_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> Dict[str, Any]:
+    r"""Handler for stacked operators like \stackrel, \overset, \underset."""
     base_arg = args[1]
     shifted_arg = args[0]
     func_name = context["funcName"]
@@ -154,7 +163,7 @@ def _stacked_handler(context, args):
     }
 
     # Create supsub structure
-    supsub = {
+    supsub: Dict[str, Any] = {
         "type": "supsub",
         "mode": shifted_arg.get("mode", context["parser"].mode),
         "base": base_op,

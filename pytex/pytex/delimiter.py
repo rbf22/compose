@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from .build_common import VListElem, make_span, make_svg_span, make_symbol, make_v_list
 from .dom_tree import DomSpan, SvgSpan, SymbolNode
@@ -14,17 +14,25 @@ from .svg_geometry import make_square_root_path
 from .types import Mode
 from .units import make_em
 
-# Placeholder - will be imported from generated data
-try:
-    from .symbols_data import symbols as SYMBOLS, ligatures as LIGATURES
-except ImportError:
-    SYMBOLS = {}
-    LIGATURES = {}
+SymbolTable = Dict[Mode, Dict[str, Dict[str, str]]]
+LigatureTable = Dict[str, bool]
+FontMetricsRaw = Dict[str, Dict[str, List[float]]]
 
 try:
-    from .font_metrics_data import FONT_METRICS_DATA
+    from .symbols_data import symbols as _SYMBOLS, ligatures as _LIGATURES
 except ImportError:
-    FONT_METRICS_DATA = {}
+    SYMBOLS: SymbolTable = {}
+    LIGATURES: LigatureTable = {}
+else:
+    SYMBOLS = cast(SymbolTable, _SYMBOLS)
+    LIGATURES = _LIGATURES
+
+try:
+    from .font_metrics_data import FONT_METRICS_DATA as _FONT_METRICS_DATA
+except ImportError:
+    FONT_METRICS_DATA: FontMetricsRaw = {}
+else:
+    FONT_METRICS_DATA = _FONT_METRICS_DATA
 
 
 def get_metrics(symbol: str, font: str, mode: Mode) -> Optional[Dict[str, float]]:
@@ -117,9 +125,10 @@ def make_glyph_span(symbol: str, font: str, mode: Mode) -> VListElem:
 
 def make_inner(ch: str, height: float, options: Options) -> VListElem:
     """Create SVG inner part of tall delimiter."""
+    code_str = str(ord(ch))
     width = (
-        FONT_METRICS_DATA.get("Size4-Regular", {}).get(ord(ch), [0, 0, 0, 0, 0])[4]
-        or FONT_METRICS_DATA.get("Size1-Regular", {}).get(ord(ch), [0, 0, 0, 0, 0])[4]
+        FONT_METRICS_DATA.get("Size4-Regular", {}).get(code_str, [0, 0, 0, 0, 0])[4]
+        or FONT_METRICS_DATA.get("Size1-Regular", {}).get(code_str, [0, 0, 0, 0, 0])[4]
     )
     svg_node = make_svg_span([], [], options)
     svg_node.attributes.update({
@@ -235,7 +244,7 @@ def make_stacked_delim(
     bottom_metrics = get_metrics(bottom, font, mode)
     bottom_height_total = bottom_metrics["height"] + bottom_metrics["depth"] if bottom_metrics else 0
 
-    middle_height_total = 0
+    middle_height_total = 0.0
     middle_factor = 1
     if middle:
         middle_metrics = get_metrics(middle, font, mode)
@@ -243,7 +252,7 @@ def make_stacked_delim(
         middle_factor = 2
 
     min_height = top_height_total + bottom_height_total + middle_height_total
-    repeat_count = max(0, round((height_total - min_height) / (middle_factor * repeat_height_total)))
+    repeat_count = max(0, int(round((height_total - min_height) / (middle_factor * repeat_height_total))))
     real_height_total = min_height + repeat_count * middle_factor * repeat_height_total
 
     axis_height = options.font_metrics()["axisHeight"]
@@ -251,7 +260,7 @@ def make_stacked_delim(
         axis_height *= options.size_multiplier
     depth = real_height_total / 2 - axis_height
 
-    stack = []
+    stack: List[VListElem] = []
 
     if font == "Size4-Regular":
         # SVG-based stacking
@@ -332,7 +341,7 @@ def make_sqrt_image(height: float, options: Options) -> Dict[str, Union[SvgSpan,
     advance_width = 0.0
 
     if delim["type"] == "small":
-        view_box_height = 1000 + round(1000 * extra_vinculum) + VB_PAD
+        view_box_height = 1000 + int(round(1000 * extra_vinculum)) + VB_PAD
         size_multiplier = 1.0 if height < 1.0 else (0.7 if height < 1.4 else new_options.size_multiplier)
         span_height = (1.0 + extra_vinculum + EM_PAD) / size_multiplier
         tex_height = (1.0 + extra_vinculum) / size_multiplier
@@ -341,7 +350,7 @@ def make_sqrt_image(height: float, options: Options) -> Dict[str, Union[SvgSpan,
         advance_width = 0.833 / size_multiplier
 
     elif delim["type"] == "large":
-        view_box_height = (1000 + VB_PAD) * SIZE_TO_MAX_HEIGHT[delim["size"]]
+        view_box_height = int((1000 + VB_PAD) * SIZE_TO_MAX_HEIGHT[delim["size"]])
         tex_height = (SIZE_TO_MAX_HEIGHT[delim["size"]] + extra_vinculum) / new_options.size_multiplier
         span_height = (SIZE_TO_MAX_HEIGHT[delim["size"]] + extra_vinculum + EM_PAD) / new_options.size_multiplier
         span = sqrt_svg(f"sqrtSize{delim['size']}", span_height, view_box_height, extra_vinculum, options)
@@ -351,7 +360,7 @@ def make_sqrt_image(height: float, options: Options) -> Dict[str, Union[SvgSpan,
     else:  # tall
         span_height = height + extra_vinculum + EM_PAD
         tex_height = height + extra_vinculum
-        view_box_height = round(1000 * height + extra_vinculum) + VB_PAD
+        view_box_height = int(round(1000 * height + extra_vinculum)) + VB_PAD
         span = sqrt_svg("sqrtTall", span_height, view_box_height, extra_vinculum, options)
         span.style["minWidth"] = "0.742em"
         advance_width = 1.056
@@ -392,6 +401,9 @@ STACK_NEVER_DELIMITERS = [
 SIZE_TO_MAX_HEIGHT = [0, 1.2, 1.8, 2.4, 3.0]
 
 
+DelimType = Dict[str, Any]
+
+
 def make_sized_delim(
     delim: str,
     size: int,
@@ -414,7 +426,7 @@ def make_sized_delim(
 
 
 # Delimiter sequences
-STACK_NEVER_DELIMITER_SEQUENCE = [
+STACK_NEVER_DELIMITER_SEQUENCE: List[DelimType] = [
     {"type": "small", "style": Style.SCRIPTSCRIPT},
     {"type": "small", "style": Style.SCRIPT},
     {"type": "small", "style": Style.TEXT},
@@ -424,14 +436,14 @@ STACK_NEVER_DELIMITER_SEQUENCE = [
     {"type": "large", "size": 4},
 ]
 
-STACK_ALWAYS_DELIMITER_SEQUENCE = [
+STACK_ALWAYS_DELIMITER_SEQUENCE: List[DelimType] = [
     {"type": "small", "style": Style.SCRIPTSCRIPT},
     {"type": "small", "style": Style.SCRIPT},
     {"type": "small", "style": Style.TEXT},
     {"type": "stack"},
 ]
 
-STACK_LARGE_DELIMITER_SEQUENCE = [
+STACK_LARGE_DELIMITER_SEQUENCE: List[DelimType] = [
     {"type": "small", "style": Style.SCRIPTSCRIPT},
     {"type": "small", "style": Style.SCRIPT},
     {"type": "small", "style": Style.TEXT},
@@ -443,7 +455,7 @@ STACK_LARGE_DELIMITER_SEQUENCE = [
 ]
 
 
-def delim_type_to_font(type_: Dict[str, Union[str, int]]) -> str:
+def delim_type_to_font(type_: DelimType) -> str:
     """Get font for delimiter type."""
     if type_["type"] == "small":
         return "Main-Regular"
@@ -458,15 +470,15 @@ def delim_type_to_font(type_: Dict[str, Union[str, int]]) -> str:
 def traverse_sequence(
     delim: str,
     height: float,
-    sequence: List[Dict[str, Union[str, int]]],
+    sequence: List[DelimType],
     options: Options,
-) -> Dict[str, Union[str, int]]:
+) -> DelimType:
     """Find appropriate delimiter in sequence."""
     start = min(2, 3 - options.style.size)
     for i in range(start, len(sequence)):
         if sequence[i]["type"] == "stack":
             break
-        metrics = get_metrics(delim, delim_type_to_font(sequence[i]), "math")
+        metrics = get_metrics(delim, delim_type_to_font(sequence[i]), Mode.MATH)
         if not metrics:
             continue
         height_depth = metrics["height"] + metrics["depth"]

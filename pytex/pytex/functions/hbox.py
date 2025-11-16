@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, List, cast
 
 from ..build_common import make_fragment
 from ..define_function import define_function, ordargument
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 
 if TYPE_CHECKING:
     from ..options import Options
@@ -51,4 +52,5 @@ def _hbox_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     from .. import build_mathml as mml
 
     hbox_group = cast("HboxParseNode", group)
-    return MathNode("mrow", mml.build_expression(hbox_group["body"], options))
+    inner = mml.build_expression(hbox_group["body"], options)
+    return MathNode("mrow", cast(List[VirtualNode], inner))

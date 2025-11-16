@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 from .define_function import HTML_GROUP_BUILDERS, MATHML_GROUP_BUILDERS, HtmlBuilder, MathMLBuilder
 
@@ -20,7 +20,7 @@ class EnvDefSpec:
     type: str
     names: List[str]
     props: EnvProps
-    handler: callable
+    handler: Callable[..., Any]
     html_builder: Optional[HtmlBuilder]
     mathml_builder: Optional[MathMLBuilder]
 
@@ -31,7 +31,7 @@ class EnvSpec:
     num_args: int
     allowed_in_text: bool
     num_optional_args: int
-    handler: callable
+    handler: Callable[..., Any]
 
 
 ENVIRONMENTS: Dict[str, EnvSpec] = {}
@@ -52,11 +52,15 @@ def _coerce_env_spec(spec: Union[EnvDefSpec, Dict[str, Any]]) -> EnvDefSpec:
         raise TypeError("Environment definition must be EnvDefSpec or dict")
 
     props = _coerce_props(spec.get("props", {}))
+    raw_handler = spec.get("handler")
+    if raw_handler is None:
+        raise TypeError("Environment definition requires a 'handler'")
+    handler = cast(Callable[..., Any], raw_handler)
     return EnvDefSpec(
         type=spec.get("type", ""),
         names=list(spec.get("names", [])),
         props=props,
-        handler=spec.get("handler"),
+        handler=handler,
         html_builder=spec.get("html_builder"),
         mathml_builder=spec.get("mathml_builder"),
     )

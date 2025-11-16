@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Dict, cast
 
 from ..build_common import make_span, make_v_list
 from ..define_function import define_function
@@ -12,29 +12,35 @@ from ..style import Style
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import HorizBraceParseNode, ParseNode
+    from ..parse_node import HorizBraceParseNode, ParseNode, SupsubParseNode
 
 
 def html_builder(group: ParseNode, options: "Options") -> Any:
     """Build HTML for horizontal braces."""
     from .. import build_html as html
 
-    horiz_brace_group = cast("HorizBraceParseNode", group)
+    horiz_brace_group: HorizBraceParseNode
     style = options.style
 
     # Handle supsub delegation
     sup_sub_group = None
-    if horiz_brace_group.get("type") == "supsub":
-        # LaTeX treats braces like operators with limits
-        if horiz_brace_group.get("sup"):
+    group_dict = cast(Dict[str, Any], group)
+    if isinstance(group, dict) and group_dict.get("type") == "supsub":
+        supsub_node = cast("SupsubParseNode", group)
+        if supsub_node.get("sup") is not None:
             sup_sub_group = html.build_group(
-                horiz_brace_group["sup"], options.having_style(style.sup()), options
+                supsub_node["sup"], options.having_style(style.sup()), options
             )
-        elif horiz_brace_group.get("sub"):
+        elif supsub_node.get("sub") is not None:
             sup_sub_group = html.build_group(
-                horiz_brace_group["sub"], options.having_style(style.sub()), options
+                supsub_node["sub"], options.having_style(style.sub()), options
             )
-        horiz_brace_group = cast("HorizBraceParseNode", horiz_brace_group["base"])  # The horizBrace is in the base
+        base_node = supsub_node.get("base")
+        if base_node is None:
+            raise ValueError(r"Horiz brace \supsub base missing")
+        horiz_brace_group = cast("HorizBraceParseNode", base_node)
+    else:
+        horiz_brace_group = cast("HorizBraceParseNode", group)
 
     # Build the base group with display style
     body = html.build_group(horiz_brace_group["base"], options.having_base_style(Style.DISPLAY))

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
 from .unicode_scripts import supported_codepoint
 
@@ -129,7 +129,10 @@ def set_font_metrics(font_name: str, metrics: Dict[int, tuple[float, float, floa
 def load_metrics(metric_map: Dict[str, Dict[str, list[float]]]) -> None:
     for font, data in metric_map.items():
         parsed = {int(code): tuple(values) for code, values in data.items()}
-        set_font_metrics(font, parsed)
+        set_font_metrics(
+            font,
+            cast(Dict[int, tuple[float, float, float, float, float]], parsed),
+        )
 
 
 def get_character_metrics(character: str, font: str, mode: str) -> Optional[Dict[str, float]]:

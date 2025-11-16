@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, TypedDict
 
 from ...build_common import make_v_list
 from ...utils import is_character_box
@@ -10,9 +10,18 @@ from ...units import make_em
 
 if TYPE_CHECKING:
     from ...options import Options
-    from ...style import StyleInterface
+    from ...style import Style
     from ...parse_node import AnyParseNode
-    from ...dom_tree import DomSpan, SymbolNode
+    from ...dom_tree import DomNode, DomSpan, SymbolNode
+
+
+class _SupSubEntry(TypedDict):
+    elem: "DomNode"
+    kern: float
+
+
+def _is_character_box_node(node: Optional[Any]) -> bool:
+    return isinstance(node, dict) and is_character_box(node)
 
 
 def assembleSupSub(
@@ -20,7 +29,7 @@ def assembleSupSub(
     sup_group: Optional[AnyParseNode],
     sub_group: Optional[AnyParseNode],
     options: Options,
-    style: StyleInterface,
+    style: "Style",
     slant: float,
     base_shift: float,
 ) -> DomSpan:
@@ -29,10 +38,10 @@ def assembleSupSub(
     from ... import build_html as html
 
     base = make_span_common([], [base])
-    sub_is_single_character = sub_group and is_character_box(sub_group)
+    sub_is_single_character = bool(sub_group and _is_character_box_node(sub_group))
 
-    sup = None
-    sub = None
+    sup: Optional[_SupSubEntry] = None
+    sub: Optional[_SupSubEntry] = None
 
     # Build superscript if present
     if sup_group:
@@ -40,13 +49,13 @@ def assembleSupSub(
             sup_group, options.having_style(style.sup()), options
         )
 
-        sup = {
-            "elem": elem,
-            "kern": max(
+        sup = _SupSubEntry(
+            elem=elem,
+            kern=max(
                 options.font_metrics().get("bigOpSpacing1", 0),
-                options.font_metrics().get("bigOpSpacing3", 0) - elem.depth
+                options.font_metrics().get("bigOpSpacing3", 0) - elem.depth,
             ),
-        }
+        )
 
     # Build subscript if present
     if sub_group:
@@ -54,13 +63,13 @@ def assembleSupSub(
             sub_group, options.having_style(style.sub()), options
         )
 
-        sub = {
-            "elem": elem,
-            "kern": max(
+        sub = _SupSubEntry(
+            elem=elem,
+            kern=max(
                 options.font_metrics().get("bigOpSpacing2", 0),
-                options.font_metrics().get("bigOpSpacing4", 0) - elem.height
+                options.font_metrics().get("bigOpSpacing4", 0) - elem.height,
             ),
-        }
+        )
 
     # Build the final group as a vlist
     if sup and sub:
@@ -118,7 +127,7 @@ def assembleSupSub(
         # This case shouldn't occur - no superscript or subscript
         return base
 
-    parts = [final_group]
+    parts: List[DomNode] = [final_group]
 
     # Add spacer if needed to avoid overlap
     if sub and slant != 0 and not sub_is_single_character:

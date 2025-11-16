@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from .token import Token
-
 
 def _decorate_message(message: str, token: Optional[Any]) -> str:
     if token is None:
@@ -37,7 +35,7 @@ def _decorate_message(message: str, token: Optional[Any]) -> str:
 @dataclass
 class ParseError(Exception):
     raw_message: str
-    token: Optional[Token] = None
+    token: Optional[Any] = None
 
     def __post_init__(self) -> None:
         self.message = _decorate_message(self.raw_message, self.token)

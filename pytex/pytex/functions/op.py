@@ -8,6 +8,7 @@ from ..build_common import make_span, make_symbol, make_v_list, mathsym, static_
 from ..define_function import define_function, ordargument
 from ..dom_tree import DomNode, DomSpan, SymbolNode
 from ..mathml_tree import MathNode, TextNode
+from ..tree import VirtualNode
 from ..parse_node import AnyParseNode, OpParseNode, ParseNode
 from ..style import Style
 from ..types import Mode
@@ -141,18 +142,21 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     op_group = cast("OpParseNode", group)
     if op_group.get("symbol"):
         mode = _as_mode(op_group.get("mode", Mode.MATH))
-        name = op_group.get("name", "")
-        node = MathNode("mo", [mml.make_text(name, mode)])
-        if name in NO_SUCCESSOR:
+        raw_name = op_group.get("name")
+        symbol_name: str = raw_name if isinstance(raw_name, str) else ""
+        node = MathNode("mo", [mml.make_text(symbol_name, mode)])
+        if symbol_name in NO_SUCCESSOR:
             node.set_attribute("largeop", "false")
         return node
 
     if op_group.get("body"):
         body_nodes = _normalize_body(op_group)
-        return MathNode("mo", mml.build_expression(body_nodes, options))
+        inner = mml.build_expression(body_nodes, options)
+        return MathNode("mo", cast(List[VirtualNode], inner))
 
-    name = op_group.get("name", "")
-    identifier = MathNode("mi", [TextNode(name[1:])])
+    raw_name = op_group.get("name")
+    identifier_name: str = raw_name if isinstance(raw_name, str) else ""
+    identifier = MathNode("mi", [TextNode(identifier_name[1:])])
     operator = MathNode("mo", [mml.make_text("\u2061", Mode.TEXT)])
     if op_group.get("parentIsSupSub"):
         return MathNode("mrow", [identifier, operator])
@@ -299,7 +303,7 @@ except ImportError:
         sup_group: Optional[AnyParseNode],
         sub_group: Optional[AnyParseNode],
         options: "Options",
-        style: Any,
+        style: Style,
         slant: float,
         base_shift: float,
     ) -> DomSpan:

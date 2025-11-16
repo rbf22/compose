@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..define_function import define_function
 from ..parse_error import ParseError
@@ -25,26 +25,26 @@ GLOBAL_MAP = {
 }
 
 
-def check_control_sequence(tok) -> str:
+def check_control_sequence(tok: Dict[str, Any]) -> str:
     """Validate control sequence token."""
-    name = tok["text"]
+    name = str(tok["text"])
     if name in ["\\", "{", "}", "$", "&", "#", "^", "_", "EOF"]:
         raise ParseError("Expected a control sequence", tok)
     return name
 
 
-def get_rhs(parser):
+def get_rhs(parser: Any) -> Dict[str, Any]:
     """Get right-hand side token, consuming optional equals and space."""
     tok = parser.gullet.pop_token()
     if tok["text"] == "=":
         tok = parser.gullet.pop_token()
         if tok["text"] == " ":
             tok = parser.gullet.pop_token()
-    return tok
+    return cast(Dict[str, Any], tok)
 
 
-def let_command(parser, name: str, tok, global_flag: bool):
-    """Execute \let command."""
+def let_command(parser: Any, name: str, tok: Dict[str, Any], global_flag: bool) -> None:
+    r"""Execute \let command."""
     macro = parser.gullet.macros.get(tok["text"])
     if macro is None:
         # Don't expand it later
@@ -105,7 +105,7 @@ define_function({
 })
 
 
-def _prefix_handler(context) -> Dict[str, Any]:
+def _prefix_handler(context: Dict[str, Any]) -> Dict[str, Any]:
     """Handler for global/long prefixes."""
     parser = context["parser"]
     func_name = context["funcName"]
@@ -117,13 +117,14 @@ def _prefix_handler(context) -> Dict[str, Any]:
         # KaTeX doesn't have \par, so ignore \long
         if func_name in ["\\global", "\\\\globallong"]:
             token["text"] = GLOBAL_MAP[token["text"]]
-        return assert_node_type(parser.parse_function(), "internal")
+        node = assert_node_type(parser.parse_function(), "internal")
+        return cast(Dict[str, Any], node)
 
     raise ParseError("Invalid token after macro prefix", token)
 
 
-def _def_handler(context) -> Dict[str, Any]:
-    """Handler for macro definitions (\def, \gdef, \edef, \xdef)."""
+def _def_handler(context: Dict[str, Any]) -> Dict[str, Any]:
+    r"""Handler for macro definitions (\def, \gdef, \edef, \xdef)."""
     parser = context["parser"]
     func_name = context["funcName"]
 
@@ -188,8 +189,8 @@ def _def_handler(context) -> Dict[str, Any]:
     }
 
 
-def _let_handler(context) -> Dict[str, Any]:
-    """Handler for \let assignments."""
+def _let_handler(context: Dict[str, Any]) -> Dict[str, Any]:
+    r"""Handler for \let assignments."""
     parser = context["parser"]
     func_name = context["funcName"]
 
@@ -205,8 +206,8 @@ def _let_handler(context) -> Dict[str, Any]:
     }
 
 
-def _futurelet_handler(context) -> Dict[str, Any]:
-    """Handler for \futurelet assignments."""
+def _futurelet_handler(context: Dict[str, Any]) -> Dict[str, Any]:
+    r"""Handler for \futurelet assignments."""
     parser = context["parser"]
     func_name = context["funcName"]
 

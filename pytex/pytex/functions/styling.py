@@ -2,24 +2,29 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, cast, List
+from typing import TYPE_CHECKING, Any, Dict, List, cast
 
 from ..define_function import define_function
 from ..mathml_tree import MathNode
+from ..tree import VirtualNode
 from ..style import Style
 
 if TYPE_CHECKING:
     from ..options import Options
-    from ..parse_node import ParseNode, StylingParseNode, AnyParseNode
-    from ..dom_tree import DomNode
+    from ..parse_node import AnyParseNode, ParseNode, StylingParseNode
+    from ..tree import DocumentFragment
 
 # Import sizingGroup from sizing
 try:
     from .sizing import sizing_group
 except ImportError:
-    def sizing_group(value: List[AnyParseNode], options: "Options", base_options: "Options") -> "DomNode":
-        """Fallback sizing group function."""
-        return value
+    def sizing_group(
+        value: List[AnyParseNode],
+        options: "Options",
+        base_options: "Options",
+    ) -> "DocumentFragment":
+        """Fallback sizing group function when sizing module is unavailable."""
+        raise RuntimeError("sizing module is required for styling commands")
 
 # Style mapping
 STYLE_MAP = {
@@ -91,7 +96,7 @@ def _styling_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
 
     inner = mml.build_expression(styling_group["body"], new_options)
 
-    node = MathNode("mstyle", inner)
+    node = MathNode("mstyle", cast(List[VirtualNode], inner))
 
     attr = STYLE_ATTRIBUTES[styling_group["style"]]
     node.set_attribute("scriptlevel", attr[0])
