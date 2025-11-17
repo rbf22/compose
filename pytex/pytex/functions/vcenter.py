@@ -22,7 +22,7 @@ define_function({
         "argTypes": ["original"],  # In LaTeX, \vcenter acts only on a box
         "allowedInText": False,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "vcenter",
         "mode": context["parser"].mode,
         "body": args[0],

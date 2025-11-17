@@ -2,7 +2,12 @@ import io
 from pathlib import Path
 
 import compose_app
-from compose_app import typeset_markdown_to_html, default_rules, load_rules_from_toml
+from compose_app import (
+    typeset_markdown_to_html,
+    typeset_markdown_to_pdf,
+    default_rules,
+    load_rules_from_toml,
+)
 from compose_app.cli import main as cli_main
 
 
@@ -47,3 +52,42 @@ def test_load_rules_from_toml_and_typeset(tmp_path: Path) -> None:
     text = "Inline math: $x^2$."
     html = typeset_markdown_to_html(text, rules=rules)
     assert "my-inline-math" in html
+
+
+def test_section_from_level_groups_h2() -> None:
+    rules = default_rules()
+    rules.section_from_level = 2
+
+    md = "\n".join(
+        [
+            "# Title",
+            "",
+            "Subtitle",
+            "",
+            "## First section",
+            "",
+            "Body",
+            "",
+            "## Second section",
+            "",
+            "More",
+        ]
+    )
+
+    html = typeset_markdown_to_html(md, rules=rules)
+
+    # Two H2s should open two <section> blocks, with matching close tags.
+    assert html.count("<section>") == 2
+    assert html.count("</section>") == 2
+    assert "<h2>First section</h2>" in html
+    assert "<h2>Second section</h2>" in html
+
+
+def test_typeset_markdown_to_pdf_basic() -> None:
+    text = "Hello PDF with $x^2$."
+
+    pdf_bytes = typeset_markdown_to_pdf(text, rules=default_rules())
+
+    assert isinstance(pdf_bytes, (bytes, bytearray))
+    # FPDF should produce a valid PDF header.
+    assert pdf_bytes.startswith(b"%PDF")

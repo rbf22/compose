@@ -20,7 +20,7 @@ define_function({
         "numArgs": 2,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "htmlmathml",
         "mode": context["parser"].mode,
         "html": ordargument(args[0]),

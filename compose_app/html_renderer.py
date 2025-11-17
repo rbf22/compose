@@ -64,6 +64,11 @@ class RuleAwareHtmlRenderer(HtmlRenderer):
 
     def __init__(self, rules: Rules, *extras, **kwargs) -> None:
         self.rules = rules
+        # Track heading/subtitle state for optional Tufte semantics.
+        self._seen_h1 = False
+        self._expect_subtitle = False
+        # Track an open <section> started by a heading, if any.
+        self._open_section_level: int | None = None
         super().__init__(MathSpan, *extras, **kwargs)
 
     def render_raw_text(self, token: span_token.RawText) -> str:  # type: ignore[override]
@@ -76,10 +81,54 @@ class RuleAwareHtmlRenderer(HtmlRenderer):
             return self.escape_html_text(f"${token.latex}$")
         return f'<span class="{self.rules.math_inline_class}">{math_html}</span>'
 
+    # ----- Block-level overrides -------------------------------------------------
+
+    def render_heading(self, token) -> str:  # type: ignore[override]
+        # Standard HtmlRenderer heading behavior.
+        level = getattr(token, "level", 1)
+        inner = self.render_inner(token)
+        rendered = f"<h{level}>{inner}</h{level}>"
+
+        if self.rules.subtitle_after_h1 and level == 1 and not self._seen_h1:
+            # After the first H1, treat the next paragraph as a subtitle.
+            self._seen_h1 = True
+            self._expect_subtitle = True
+
+        # Optionally wrap sections starting at a configured heading level.
+        section_level = self.rules.section_from_level
+        if section_level is not None and level == section_level:
+            parts = []
+            if self._open_section_level is not None:
+                parts.append("</section>")
+            parts.append("<section>")
+            parts.append(rendered)
+            self._open_section_level = level
+            return "\n".join(parts)
+
+        return rendered
+
+    def render_paragraph(self, token) -> str:  # type: ignore[override]
+        if self.rules.subtitle_after_h1 and self._expect_subtitle:
+            # Only apply subtitle styling to the very next paragraph.
+            self._expect_subtitle = False
+            inner = self.render_inner(token)
+            cls = self.escape_html_text(self.rules.subtitle_class)
+            return f'<p class="{cls}">{inner}</p>'
+
+        # Fallback to HtmlRenderer behavior, including list-related
+        # paragraph suppression logic.
+        return super().render_paragraph(token)
+
     def render_document(self, token) -> str:  # type: ignore[override]
         # Base behavior: render children and collect footnotes.
         self.footnotes.update(getattr(token, "footnotes", {}))
-        inner = "\n".join([self.render(child) for child in token.children])
+        inner_parts: List[str] = [self.render(child) for child in token.children]
+        inner = "\n".join(inner_parts)
+
+        # Close any trailing <section> opened by headings.
+        if self.rules.section_from_level is not None and self._open_section_level is not None:
+            inner = f"{inner}\n</section>"
+            self._open_section_level = None
 
         if not self.rules.html_document:
             return f"{inner}\n" if inner else ""

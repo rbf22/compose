@@ -311,6 +311,14 @@ def make_span(
         children=list(children) if children is not None else [],
         style=style or {},
     )
+    if options:
+        # Mirror KaTeX's initNode behaviour: add mtight in tight styles and
+        # propagate current color to the span.
+        if options.style.is_tight():
+            span.classes.append("mtight")
+        color = options.get_color()
+        if color:
+            span.style["color"] = color
     size_element_from_children(span)
     return span
 
@@ -327,6 +335,12 @@ def make_svg_span(
         children=list(children) if children is not None else [],
         style=style or {},
     )
+    if options:
+        if options.style.is_tight():
+            span.classes.append("mtight")
+        color = options.get_color()
+        if color:
+            span.style["color"] = color
     size_element_from_children(span)
     return span
 
@@ -409,11 +423,16 @@ def make_v_list(params: Dict[str, Any], options: Options) -> DomSpan:
     """Create vertical list."""
     children, depth = get_v_list_children_and_depth(params)
 
-    pstrut_size = 2.0
+    # Match KaTeX's pstrut sizing: start at 0, take the maximum of the
+    # children's maxFontSize/height, then add 2em of padding so the strut
+    # is taller than any child.  This ensures correct baseline alignment
+    # and overall vlist height.
+    pstrut_size = 0.0
     for child in children:
         if child["type"] == "elem":
             elem = child["elem"]
             pstrut_size = max(pstrut_size, elem.max_font_size, elem.height)
+    pstrut_size += 2.0
     pstrut = make_span(["pstrut"], [])
     pstrut.style["height"] = make_em(pstrut_size)
 

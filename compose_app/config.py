@@ -26,6 +26,15 @@ class Rules:
         body_class: optional CSS class for the <body> element.
         article_wrapper: whether to wrap the rendered content in an
             <article> tag inside <body>.
+        subtitle_after_h1: whether to treat the first paragraph after the
+            first H1 as a subtitle.
+        subtitle_class: CSS class to apply to the subtitle paragraph.
+        section_from_level: heading level at which <section> wrappers are
+            started (for example, 2 to start sections at H2). If None, no
+            section elements are emitted.
+        pdf_vector_math_enabled: whether to attempt vector-like math
+            layout in the PDF backend for simple expressions (currently
+            a tiny PoC subset only).
     """
 
     math_inline_class: str = "math-inline"
@@ -34,6 +43,10 @@ class Rules:
     stylesheets: list[str] = field(default_factory=list)
     body_class: str | None = None
     article_wrapper: bool = False
+    subtitle_after_h1: bool = False
+    subtitle_class: str = "subtitle"
+    section_from_level: int | None = None
+    pdf_vector_math_enabled: bool = False
 
 
 def default_rules() -> Rules:
@@ -63,6 +76,15 @@ def _rules_from_mapping(data: Mapping[str, Any]) -> Rules:
     body_class_value = rules_section.get("body_class")
     body_class = str(body_class_value) if body_class_value is not None else None
 
+    section_from_level_value = rules_section.get("section_from_level")
+    if section_from_level_value is None:
+        section_from_level: int | None = None
+    else:
+        try:
+            section_from_level = int(section_from_level_value)
+        except (TypeError, ValueError):
+            section_from_level = None
+
     return Rules(
         math_inline_class=str(rules_section.get("math_inline_class", "math-inline")),
         math_display_class=str(rules_section.get("math_display_class", "math-display")),
@@ -70,6 +92,10 @@ def _rules_from_mapping(data: Mapping[str, Any]) -> Rules:
         stylesheets=stylesheets,
         body_class=body_class,
         article_wrapper=bool(rules_section.get("article_wrapper", False)),
+        subtitle_after_h1=bool(rules_section.get("subtitle_after_h1", False)),
+        subtitle_class=str(rules_section.get("subtitle_class", "subtitle")),
+        section_from_level=section_from_level,
+        pdf_vector_math_enabled=bool(rules_section.get("pdf_vector_math_enabled", False)),
     )
 
 

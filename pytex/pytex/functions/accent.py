@@ -210,7 +210,7 @@ define_function({
     "props": {
         "numArgs": 1,
     },
-    "handler": lambda context, args: _accent_handler(context, args, False),
+    "handler": lambda context, args, opt_args: _accent_handler(context, args, False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -228,7 +228,7 @@ define_function({
         "allowedInMath": True,
         "argTypes": ["primitive"],
     },
-    "handler": lambda context, args: _accent_handler(context, args, True),
+    "handler": lambda context, args, opt_args: _accent_handler(context, args, True),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

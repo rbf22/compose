@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import re
 from typing import Any, Dict, List, Optional, cast
 
@@ -378,27 +377,9 @@ class Parser:
         if func and func.handler:
             handler = func.handler
 
-            # Handlers in the port may follow either the original KaTeX
-            # signature (context, args, optArgs) or a simplified
-            # (context, args) form.  Use introspection to dispatch to the
-            # appropriate calling convention without breaking either.
-            try:
-                sig = inspect.signature(handler)  # type: ignore[arg-type]
-            except (TypeError, ValueError):  # builtins or unsupported
-                result = handler(context, args, opt_args)  # type: ignore[misc]
-            else:
-                params = list(sig.parameters.values())
-                # Count only positional/positional-or-keyword parameters; ignore
-                # *args/**kwargs as they happily accept either form.
-                positional_params = [p for p in params if p.kind in (
-                    inspect.Parameter.POSITIONAL_ONLY,
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                )]
-
-                if len(positional_params) <= 2:
-                    result = handler(context, args)  # type: ignore[misc]
-                else:
-                    result = handler(context, args, opt_args)  # type: ignore[misc]
+            # All function handlers in the port follow KaTeX's calling
+            # convention: handler(context, args, optArgs).
+            result = handler(context, args, opt_args)  # type: ignore[misc]
 
             # In KaTeX, a handler is expected to return a parse node.  For the
             # Python port we treat falsy/empty returns (such as "{}" from a

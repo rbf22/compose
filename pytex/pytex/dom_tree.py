@@ -135,7 +135,11 @@ class SymbolNode(DomNode):
             if script:
                 self.add_class(f"{script}_fallback")
         if self.italic:
-            self.style.setdefault("marginRight", make_em(self.italic))
+            # Use the raw italic correction value directly so that CSS
+            # margin-right matches KaTeX's unrounded metric output
+            # (e.g. 0.03588em, 0.44445em) instead of being rounded via
+            # make_em.
+            self.style.setdefault("marginRight", f"{self.italic}em")
 
     def to_markup(self) -> str:
         if self.classes or self.style:

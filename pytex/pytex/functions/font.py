@@ -99,7 +99,7 @@ define_function({
         "numArgs": 1,
         "allowedInArgument": True,
     },
-    "handler": lambda context, args: _font_handler(context, args, False),
+    "handler": lambda context, args, opt_args: _font_handler(context, args, False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -109,7 +109,7 @@ define_function({
     "type": "mclass",
     "names": ["\\boldsymbol", "\\bm"],
     "props": {"numArgs": 1},
-    "handler": lambda context, args: _boldsymbol_handler(context, args),
+    "handler": lambda context, args, opt_args: _boldsymbol_handler(context, args),
 })
 
 # Old-style font commands
@@ -120,7 +120,7 @@ define_function({
         "numArgs": 0,
         "allowedInText": True,
     },
-    "handler": lambda context, args: _old_font_handler(context),
+    "handler": lambda context, args, opt_args: _old_font_handler(context),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

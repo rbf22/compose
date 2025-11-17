@@ -55,7 +55,7 @@ define_function({
         "allowedInText": True,
         "primitive": True,
     },
-    "handler": lambda context, args: _styling_handler(context, args),
+    "handler": lambda context, args, opt_args: _styling_handler(context, args),
     "html_builder": lambda group, options: _styling_html_builder(group, options),
     "mathml_builder": lambda group, options: _styling_mathml_builder(group, options),
 })

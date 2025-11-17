@@ -19,7 +19,7 @@ define_function({
         "allowedInText": True,
         "allowedInArgument": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "internal",
         "mode": context["parser"].mode,
     },

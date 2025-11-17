@@ -33,6 +33,12 @@ The plan is structured into phases with checklists so we can track what is imple
   - HTML and MathML (via the internal renderer abstraction).
 - [x] Independent library with its own tests and documentation.
 
+### 0.3 `fpdf` / PyFPDF – PDF Backend
+
+- [x] Lightweight PDF generation library (text, simple layout, basic drawing).
+- [x] Local copy vendored under `fpdf/`.
+- [x] Provides the `FPDF` class used by the prototype `PdfRenderer` in `compose_app/pdf_renderer.py`.
+
 These are **building blocks**. The Compose project will sit on top of them and provide a higher-level document/typesetting pipeline.
 
 ---
@@ -170,7 +176,7 @@ After basic HTML typesetting works, refine the semantics and rules with an eye t
 
 ### 4.1 PDF Backend Selection
 
-- [ ] Choose a PDF library compatible with the project’s constraints (ideally pure Python):
+- [x] Choose a PDF library compatible with the project’s constraints (ideally pure Python): **`fpdf` / PyFPDF** vendored under `fpdf/`.
   - Candidates: `reportlab`, or a minimal custom PDF writer if you want no external deps.
 - [ ] Decide how strict the “no external dependencies” policy should be for the PDF feature:
   - [ ] Core app stays pure-stdlib.
@@ -188,11 +194,12 @@ After basic HTML typesetting works, refine the semantics and rules with an eye t
 
 ### 4.3 `PdfRenderer` Over `mistletoe.Document`
 
-- [ ] Create `pdf_renderer.py` (e.g. `compose_app/pdf_renderer.py`):
+- [x] Create `pdf_renderer.py` (e.g. `compose_app/pdf_renderer.py`) using `fpdf` / PyFPDF.
   - [ ] Accepts `Document` AST and `Rules`.
   - [ ] Walks the AST and:
     - [ ] Lays out headings, paragraphs, lists, tables, code, and math.
     - [ ] Maintains current page, cursor position, and handles page breaks.
+  - [x] Prototype implementation handles headings, paragraphs, simple lists, and inline math via `MathSpan` + `pytex.katex` (converted to plain text).
   - [ ] For math:
     - [ ] Either interpret `pytex` output (e.g. a box model) into PDF drawing commands, or
     - [ ] Use a separate math layout layer that shares logic with HTML.
@@ -237,6 +244,6 @@ After basic HTML typesetting works, refine the semantics and rules with an eye t
   - [x] Markdown + math wrapper around `mistletoe` (including structural `MathSpan` tokens).
   - [x] Rule-aware HTML renderer using `pytex` (inline math + optional full HTML document output).
   - [x] CLI / entrypoint (`python -m compose_app.cli ...`).
-  - [ ] PDF layout engine and renderer
+  - [ ] PDF layout engine and renderer (prototype `PdfRenderer` over `fpdf` exists; layout model still minimal).
 
 This file should be kept up to date as pieces are implemented.

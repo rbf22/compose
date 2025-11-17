@@ -20,7 +20,7 @@ define_function({
     "props": {
         "numArgs": 1,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "overline",
         "mode": context["parser"].mode,
         "body": args[0],

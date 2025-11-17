@@ -23,7 +23,7 @@ define_function({
         "argTypes": ["url", "original"],
         "allowedInText": True,
     },
-    "handler": lambda context, args: _href_handler(context, args, False),
+    "handler": lambda context, args, opt_args: _href_handler(context, args, False),
     "html_builder": lambda group, options: _href_html_builder(group, options),
     "mathml_builder": lambda group, options: _href_mathml_builder(group, options),
 })
@@ -37,7 +37,7 @@ define_function({
         "argTypes": ["url"],
         "allowedInText": True,
     },
-    "handler": lambda context, args: _href_handler(context, args, True),
+    "handler": lambda context, args, opt_args: _href_handler(context, args, True),
     "html_builder": lambda group, options: _href_html_builder(group, options),
     "mathml_builder": lambda group, options: _href_mathml_builder(group, options),
 })

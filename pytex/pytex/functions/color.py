@@ -55,7 +55,7 @@ define_function({
         "allowedInText": True,
         "argTypes": ["color", "original"],
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "color",
         "mode": context["parser"].mode,
         "color": cast("ColorTokenParseNode", assert_node_type(args[0], "color-token"))["color"],
@@ -74,7 +74,7 @@ define_function({
         "allowedInText": True,
         "argTypes": ["color"],
     },
-    "handler": lambda context, args: _color_handler(context, args),
+    "handler": lambda context, args, opt_args: _color_handler(context, args),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

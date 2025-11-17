@@ -1,0 +1,9 @@
+[rules]
+html_document = true
+stylesheets = ["tufte-css/tufte.css"]
+article_wrapper = true
+subtitle_after_h1 = true
+subtitle_class = "subtitle"
+
+# Start <section> wrappers at H2, matching Tufte's example structure.
+section_from_level = 2

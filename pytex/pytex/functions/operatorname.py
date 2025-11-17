@@ -128,7 +128,7 @@ define_function({
     "type": "operatorname",
     "names": ["\\operatorname@", "\\operatornamewithlimits"],
     "props": {"numArgs": 1},
-    "handler": _operatorname_handler,
+    "handler": lambda context, args, opt_args: _operatorname_handler(context, args),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

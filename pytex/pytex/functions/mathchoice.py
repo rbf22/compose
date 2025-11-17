@@ -41,7 +41,7 @@ define_function({
         "numArgs": 4,
         "primitive": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "mathchoice",
         "mode": context["parser"].mode,
         "display": ordargument(args[0]),

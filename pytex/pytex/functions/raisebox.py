@@ -24,7 +24,7 @@ define_function({
         "argTypes": ["size", "hbox"],
         "allowedInText": True,
     },
-    "handler": lambda context, args: _raisebox_handler(context, args),
+    "handler": lambda context, args, opt_args: _raisebox_handler(context, args),
     "html_builder": lambda group, options: _raisebox_html_builder(group, options),
     "mathml_builder": lambda group, options: _raisebox_mathml_builder(group, options),
 })

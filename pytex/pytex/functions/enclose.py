@@ -231,7 +231,7 @@ define_function({
         "allowedInText": True,
         "argTypes": ["color", "text"],
     },
-    "handler": lambda context, args: _enclose_handler(context, args, False),
+    "handler": lambda context, args, opt_args: _enclose_handler(context, args, False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -244,7 +244,7 @@ define_function({
         "allowedInText": True,
         "argTypes": ["color", "color", "text"],
     },
-    "handler": lambda context, args: _enclose_handler(context, args, True),
+    "handler": lambda context, args, opt_args: _enclose_handler(context, args, True),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -257,7 +257,7 @@ define_function({
         "argTypes": ["hbox"],
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "enclose",
         "mode": context["parser"].mode,
         "label": "\\fbox",
@@ -273,7 +273,7 @@ define_function({
     "props": {
         "numArgs": 1,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "enclose",
         "mode": context["parser"].mode,
         "label": context["funcName"],
@@ -291,7 +291,7 @@ define_function({
         "argTypes": ["hbox"],
         "allowedInText": False,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "enclose",
         "mode": context["parser"].mode,
         "label": "\\angl",

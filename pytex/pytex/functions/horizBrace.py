@@ -133,7 +133,7 @@ define_function({
     "props": {
         "numArgs": 1,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "horizBrace",
         "mode": context["parser"].mode,
         "label": context["funcName"],

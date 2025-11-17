@@ -20,7 +20,7 @@ define_function({
         "allowedInText": True,
         "allowedInMath": False,
     },
-    "handler": lambda context, args: _math_delimiter_handler(context, args),
+    "handler": lambda context, args, opt_args: _math_delimiter_handler(context, args),
 })
 
 # Closing math delimiters - check for mismatched delimiters
@@ -32,7 +32,7 @@ define_function({
         "allowedInText": True,
         "allowedInMath": False,
     },
-    "handler": lambda context, args: _closing_delimiter_handler(context, args),
+    "handler": lambda context, args, opt_args: _closing_delimiter_handler(context, args),
 })
 
 

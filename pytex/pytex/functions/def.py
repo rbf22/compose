@@ -65,7 +65,7 @@ define_function({
         "numArgs": 0,
         "allowedInText": True,
     },
-    "handler": lambda context: _prefix_handler(context),
+    "handler": lambda context, args, opt_args: _prefix_handler(context),
 })
 
 # Macro definitions
@@ -77,7 +77,7 @@ define_function({
         "allowedInText": True,
         "primitive": True,
     },
-    "handler": lambda context: _def_handler(context),
+    "handler": lambda context, args, opt_args: _def_handler(context),
 })
 
 # Let assignments
@@ -89,7 +89,7 @@ define_function({
         "allowedInText": True,
         "primitive": True,
     },
-    "handler": lambda context: _let_handler(context),
+    "handler": lambda context, args, opt_args: _let_handler(context),
 })
 
 # Futurelet assignments
@@ -101,7 +101,7 @@ define_function({
         "allowedInText": True,
         "primitive": True,
     },
-    "handler": lambda context: _futurelet_handler(context),
+    "handler": lambda context, args, opt_args: _futurelet_handler(context),
 })
 
 

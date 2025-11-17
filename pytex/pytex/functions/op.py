@@ -64,7 +64,7 @@ def html_builder(group: ParseNode, options: "Options") -> DomSpan:
         and op_group_map.get("name") not in NO_SUCCESSOR
     )
 
-    base: DomSpan
+    base: DomNode
     name = op_group_map.get("name", "")
 
     if op_group_map.get("symbol"):
@@ -81,7 +81,6 @@ def html_builder(group: ParseNode, options: "Options") -> DomSpan:
             options,
             ["mop", "op-symbol", "large-op" if large else "small-op"],
         )
-        base = make_span(list(symbol_node.classes), [symbol_node], options)
         symbol_slant = symbol_node.italic
 
         if stash:
@@ -90,7 +89,7 @@ def html_builder(group: ParseNode, options: "Options") -> DomSpan:
                 {
                     "positionType": "individualShift",
                     "children": [
-                        {"type": "elem", "elem": base, "shift": 0},
+                        {"type": "elem", "elem": symbol_node, "shift": 0},
                         {"type": "elem", "elem": oval, "shift": 0.08 if large else 0.0},
                     ],
                 },
@@ -99,6 +98,7 @@ def html_builder(group: ParseNode, options: "Options") -> DomSpan:
             base.classes.insert(0, "mop")
             base_slant = symbol_slant
         else:
+            base = symbol_node
             base_slant = symbol_slant
 
     elif op_group_map.get("body"):
@@ -202,7 +202,7 @@ define_function({
     "props": {
         "numArgs": 0,
     },
-    "handler": lambda context, args: _op_handler(context, args, limits=True, symbol=True),
+    "handler": lambda context, args, opt_args: _op_handler(context, args, limits=True, symbol=True),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -215,7 +215,7 @@ define_function({
         "numArgs": 1,
         "primitive": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "op",
         "mode": context["parser"].mode,
         "limits": False,
@@ -240,7 +240,7 @@ define_function({
     "props": {
         "numArgs": 0,
     },
-    "handler": lambda context, args: _op_handler(context, args, limits=False, symbol=False),
+    "handler": lambda context, args, opt_args: _op_handler(context, args, limits=False, symbol=False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -254,7 +254,7 @@ define_function({
     "props": {
         "numArgs": 0,
     },
-    "handler": lambda context, args: _op_handler(context, args, limits=True, symbol=False),
+    "handler": lambda context, args, opt_args: _op_handler(context, args, limits=True, symbol=False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -269,7 +269,7 @@ define_function({
     "props": {
         "numArgs": 0,
     },
-    "handler": lambda context, args: _op_handler(context, args, limits=False, symbol=True),
+    "handler": lambda context, args, opt_args: _op_handler(context, args, limits=False, symbol=True),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

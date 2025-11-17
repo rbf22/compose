@@ -22,7 +22,7 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "phantom",
         "mode": context["parser"].mode,
         "body": ordargument(args[0]),
@@ -39,7 +39,7 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "hphantom",
         "mode": context["parser"].mode,
         "body": args[0],
@@ -56,7 +56,7 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "vphantom",
         "mode": context["parser"].mode,
         "body": args[0],

@@ -28,7 +28,7 @@ define_function({
         "allowedInText": True,
         "primitive": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "hbox",
         "mode": context["parser"].mode,
         "body": ordargument(args[0]),

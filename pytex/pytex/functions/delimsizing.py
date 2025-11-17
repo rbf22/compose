@@ -123,7 +123,7 @@ define_function({
         "numArgs": 1,
         "argTypes": ["primitive"],
     },
-    "handler": lambda context, args: _delimsizing_handler(context, args),
+    "handler": lambda context, args, opt_args: _delimsizing_handler(context, args),
     "html_builder": lambda group, options: _delimsizing_html_builder(group, options),
     "mathml_builder": lambda group, options: _delimsizing_mathml_builder(group, options),
 })
@@ -136,7 +136,7 @@ define_function({
         "numArgs": 1,
         "primitive": True,
     },
-    "handler": lambda context, args: _right_handler(context, args),
+    "handler": lambda context, args, opt_args: _right_handler(context, args),
 })
 
 # \left...\right delimiters
@@ -147,7 +147,7 @@ define_function({
         "numArgs": 1,
         "primitive": True,
     },
-    "handler": lambda context, args: _left_handler(context, args),
+    "handler": lambda context, args, opt_args: _left_handler(context, args),
     "html_builder": lambda group, options: _leftright_html_builder(group, options),
     "mathml_builder": lambda group, options: _leftright_mathml_builder(group, options),
 })
@@ -160,7 +160,7 @@ define_function({
         "numArgs": 1,
         "primitive": True,
     },
-    "handler": lambda context, args: _middle_handler(context, args),
+    "handler": lambda context, args, opt_args: _middle_handler(context, args),
     "html_builder": lambda group, options: _middle_html_builder(group, options),
     "mathml_builder": lambda group, options: _middle_mathml_builder(group, options),
 })

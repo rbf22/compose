@@ -72,7 +72,7 @@ define_function({
         "allowedInArgument": True,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "text",
         "mode": context["parser"].mode,
         "body": ordargument(args[0]),

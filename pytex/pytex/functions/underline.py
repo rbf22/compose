@@ -21,7 +21,7 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "underline",
         "mode": context["parser"].mode,
         "body": args[0],

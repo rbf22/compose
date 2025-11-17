@@ -25,7 +25,7 @@ define_function({
         "numArgs": 1,
         "argTypes": ["text"],
     },
-    "handler": lambda context, args: _environment_handler(context, args),
+    "handler": lambda context, args, opt_args: _environment_handler(context, args),
 })
 
 

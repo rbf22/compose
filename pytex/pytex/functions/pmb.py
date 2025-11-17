@@ -31,7 +31,7 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: _pmb_handler(context, args),
+    "handler": lambda context, args, opt_args: _pmb_handler(context, args),
     "html_builder": lambda group, options: _pmb_html_builder(group, options),
     "mathml_builder": lambda group, options: _pmb_mathml_builder(group, options),
 })

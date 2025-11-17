@@ -20,7 +20,7 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: _char_handler(context, args),
+    "handler": lambda context, args, opt_args: _char_handler(context, args),
 })
 
 

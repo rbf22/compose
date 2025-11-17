@@ -254,7 +254,7 @@ define_function({
         "numArgs": 2,
         "allowedInArgument": True,
     },
-    "handler": lambda context, args: _genfrac_handler(context, args, False),
+    "handler": lambda context, args, opt_args: _genfrac_handler(context, args, False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -389,7 +389,7 @@ def _genfrac_full_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str,
     }
 
 
-def _above_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
+def _above_handler(context: Dict[str, Any], args: List[Any], opt_args: List[Any]) -> Dict[str, Any]:
     r"""Handler for \above command."""
     from ..parse_node import assert_node_type
 
@@ -402,8 +402,8 @@ def _above_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
     }
 
 
-def _abovefrac_handler(context: Dict[str, Any], args: List[Any]) -> Dict[str, Any]:
-    r"""Handler for \abovefrac command."""
+def _abovefrac_handler(context: Dict[str, Any], args: List[Any], opt_args: List[Any]) -> Dict[str, Any]:
+    r"""Handler for \abovefrac function."""
     from ..parse_node import assert_node_type
 
     numer = args[0]
@@ -439,7 +439,7 @@ define_function({
         "numArgs": 2,
         "allowedInArgument": True,
     },
-    "handler": lambda context, args: _genfrac_handler(context, args, False),
+    "handler": lambda context, args, opt_args: _genfrac_handler(context, args, False),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })
@@ -450,7 +450,7 @@ define_function({
     "props": {
         "numArgs": 2,
     },
-    "handler": lambda context, args: _genfrac_handler(context, args, True),
+    "handler": lambda context, args, opt_args: _genfrac_handler(context, args, True),
 })
 
 # Infix generalized fractions
@@ -461,7 +461,7 @@ define_function({
         "numArgs": 0,
         "infix": True,
     },
-    "handler": _infix_genfrac_handler,
+    "handler": lambda context, args, opt_args: _infix_genfrac_handler(context),
 })
 
 # \genfrac function
@@ -473,7 +473,7 @@ define_function({
         "allowedInArgument": True,
         "argTypes": ["math", "math", "size", "text", "math", "math"],
     },
-    "handler": _genfrac_full_handler,
+    "handler": lambda context, args, opt_args: _genfrac_full_handler(context, args),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

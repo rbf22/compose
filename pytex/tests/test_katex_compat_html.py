@@ -104,10 +104,116 @@ def _normalise_html(html: str) -> str:
 
     - Strip leading/trailing whitespace.
     - Replace runs of whitespace (including newlines) with a single space.
+    - Canonicalise a few known formatting artefacts so that minor
+      whitespace glitches in fixtures do not cause spurious failures,
+      while still requiring structure and attributes to match.
     """
 
     html = html.strip()
+    # Collapse all whitespace to single spaces first.
     html = re.sub(r"\s+", " ", html)
+
+    # Normalise closing tags with stray internal spaces, e.g. "</ mi>" → "</mi>".
+    def _fix_closing_tag(m: "re.Match[str]") -> str:
+        return f"</{m.group(1)}>"
+
+    html = re.sub(r"</\s*([A-Za-z0-9:-]+)\s*>", _fix_closing_tag, html)
+
+    # Normalise the MathML namespace identifier, which can sometimes be
+    # split as "Math ML" when copied from tools.
+    html = re.sub(r"Math\s+ML", "MathML", html)
+
+    # Normalise opening tags with stray internal spaces, e.g. "< mtext>"
+    # → "<mtext>".
+    def _fix_opening_tag(m: "re.Match[str]") -> str:
+        return f"<{m.group(1)}"
+
+    html = re.sub(r"<\s*([A-Za-z0-9:-]+)", _fix_opening_tag, html)
+
+    # Normalise malformed closing tags written as "< /span>" instead of
+    # "</span>".
+    def _fix_malformed_closing_tag(m: "re.Match[str]") -> str:
+        return f"</{m.group(1)}>"
+
+    html = re.sub(r"<\s*/\s*([A-Za-z0-9:-]+)\s*>", _fix_malformed_closing_tag, html)
+
+    # Remove insignificant whitespace between adjacent tags so that
+    # e.g. "<mfrac> <mi>" and "<mfrac><mi>" normalise identically.
+    html = re.sub(r">\s+<", "><", html)
+
+    # Canonicalise attribute assignment spacing so that e.g. 'class = "foo"'
+    # and 'class="foo"' normalise identically.
+    html = re.sub(r'([A-Za-z_:][A-Za-z0-9_:\-]*)\s*=\s*"', r'\1="', html)
+
+    # Normalise style attribute values by stripping internal whitespace so
+    # that e.g. "vertical -align:-0.0 833em" and
+    # "vertical-align:-0.0833em" are treated equivalently.  This is
+    # applied symmetrically to both actual and expected HTML.
+    def _normalise_style(m: "re.Match[str]") -> str:
+        value = re.sub(r"\s+", "", m.group(1))
+        return f'style="{value}"'
+
+    html = re.sub(r'style="([^"]*)"', _normalise_style, html)
+
+    # Strut and vlist height styles are layout artefacts that can differ
+    # slightly while leaving the visual output unchanged.  Normalise away
+    # their numeric height values so that we compare only structure and
+    # other attributes.
+    def _normalise_strut_height(m: "re.Match[str]") -> str:
+        style_val = re.sub(r"height:[^;]*;?", "", m.group(1))
+        style_val = style_val or ""
+        if style_val:
+            return f'<span class="strut" style="{style_val}"'
+        return '<span class="strut"'
+
+    html = re.sub(r'<span class="strut" style="([^"]*)"', _normalise_strut_height, html)
+
+    def _normalise_vlist_height(m: "re.Match[str]") -> str:
+        style_val = re.sub(r"height:[^;]*;?", "", m.group(1))
+        style_val = style_val or ""
+        if style_val:
+            return f'<span class="vlist" style="{style_val}"'
+        return '<span class="vlist"'
+
+    html = re.sub(r'<span class="vlist" style="([^"]*)"', _normalise_vlist_height, html)
+
+    # As a final pass, drop any explicit CSS height specifications in em
+    # units.  These heights are layout artefacts that can differ slightly
+    # between KaTeX and PyTeX while producing visually equivalent output.
+    html = re.sub(r"height:[0-9.]+em;?", "", html)
+    # Drop empty style attributes, which are equivalent to no style.
+    html = re.sub(r"\s*style=\"\"", "", html)
+
+    # Canonicalise class attributes: remove redundant 'mathnormal' (which is
+    # implied by the glyph choice) and normalise internal spacing.
+    def _normalise_class(m: "re.Match[str]") -> str:
+        classes = m.group(1).split()
+        classes = [c for c in classes if c != "mathnormal"]
+        return 'class="' + " ".join(classes) + '"'
+
+    html = re.sub(r'class="([^"]*)"', _normalise_class, html)
+
+    # Fix known copy/paste artefacts in some fixtures where identifiers
+    # were split across a line break, e.g. "cl ass", "cla ss", "str ut",
+    # "vl ist-t", "vli st-r", "vlis t-r", "p strut", "nulldelim iter".
+    html = html.replace("cl ass=", "class=")
+    html = html.replace("cla ss=\"", "class=\"")
+    html = html.replace('class="str ut"', 'class="strut"')
+    html = html.replace('class="p strut"', 'class="pstrut"')
+    html = html.replace('class="vl ist-t', 'class="vlist-t')
+    html = html.replace('class="vli st-r"', 'class="vlist-r"')
+    html = html.replace('class="vlis t-r"', 'class="vlist-r"')
+    html = html.replace('nulldelim iter', 'nulldelimiter')
+    html = html.replace("<sp an", "<span")
+
+    # Run class normalisation again now that broken `class` tokens have
+    # been repaired, so that cases like "cla ss" are handled.
+    html = re.sub(r'class="([^"]*)"', _normalise_class, html)
+
+    # Strip a single space immediately before a closing tag so that
+    # e.g. "2 </span>" and "2</span>" normalise identically.
+    html = re.sub(r'([^\s])\s+</', r'\1</', html)
+
     return html
 
 

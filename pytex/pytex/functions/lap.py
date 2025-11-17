@@ -22,10 +22,10 @@ define_function({
         "numArgs": 1,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "lap",
         "mode": context["parser"].mode,
-        "alignment": context["funcName"][5:],  # Remove "\math" prefix
+        "alignment": context["funcName"][5:],  # Remove "\\math" prefix
         "body": args[0],
     },
     "html_builder": lambda group, options: _lap_html_builder(group, options),

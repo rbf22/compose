@@ -96,7 +96,7 @@ define_function({
         "numArgs": 1,
         "primitive": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "mclass",
         "mode": context["parser"].mode,
         "mclass": f"m{context['funcName'][5:]}",  # Remove "\math" prefix
@@ -114,7 +114,7 @@ define_function({
     "props": {
         "numArgs": 2,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "mclass",
         "mode": context["parser"].mode,
         "mclass": binrel_class(args[0]),
@@ -132,7 +132,7 @@ define_function({
     "props": {
         "numArgs": 2,
     },
-    "handler": lambda context, args: _stacked_handler(context, args),
+    "handler": lambda context, args, opt_args: _stacked_handler(context, args),
     "html_builder": html_builder,
     "mathml_builder": mathml_builder,
 })

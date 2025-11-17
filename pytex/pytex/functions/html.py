@@ -24,7 +24,7 @@ define_function({
         "argTypes": ["raw", "original"],
         "allowedInText": True,
     },
-    "handler": lambda context, args: _html_handler(context, args),
+    "handler": lambda context, args, opt_args: _html_handler(context, args),
     "html_builder": lambda group, options: _html_html_builder(group, options),
     "mathml_builder": lambda group, options: _html_mathml_builder(group, options),
 })

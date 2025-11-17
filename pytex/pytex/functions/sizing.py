@@ -83,7 +83,7 @@ define_function({
         "numArgs": 0,
         "allowedInText": True,
     },
-    "handler": lambda context, args: {
+    "handler": lambda context, args, opt_args: {
         "type": "sizing",
         "mode": context["parser"].mode,
         "size": SIZE_FUNCS.index(context["funcName"]) + 1,  # Size is 1-indexed
