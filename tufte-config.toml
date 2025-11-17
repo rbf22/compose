@@ -1,0 +1,5 @@
+[rules]
+html_document = true
+stylesheets = ["tufte-css/tufte.css"]
+article_wrapper = true
+# math_inline_class and other options fall back to defaults

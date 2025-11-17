@@ -60,7 +60,11 @@ def calculate_size(size_value: Measurement, options: Options) -> float:
 
 
 def make_em(value: float) -> str:
-    return f"{value:.4f}em"
+    # Format with up to 4 decimal places, trimming trailing zeros and any
+    # dangling decimal point so that e.g. 0.6250 -> 0.625 and 1.0000 -> 1.
+    s = f"{value:.4f}"
+    s = s.rstrip("0").rstrip(".") or "0"
+    return f"{s}em"
 
 
 __all__ = [

@@ -38,12 +38,21 @@ define_function_builders({
 def _mathord_mathml_builder(group: ParseNode, options: "Options") -> MathNode:
     """Build MathML for mathord symbols."""
     from .. import build_mathml as mml
+    import re
 
     mathord_group = cast("MathordParseNode", group)
-    node = MathNode("mi", [mml.make_text(mathord_group["text"], mathord_group["mode"], options)])
+    text = mathord_group["text"]
 
-    variant = mml.get_variant(mathord_group, options) or "italic"
-    if variant != DEFAULT_VARIANT.get(node.type, ""):
+    # KaTeX emits digits as <mn> rather than <mi>.  For identifiers we keep
+    # <mi> with italic default, but for numbers we use <mn> with normal
+    # variant and avoid an explicit mathvariant attribute unless it differs
+    # from the default for that node type.
+    node_type = "mn" if re.match(r"^[0-9]+$", text) else "mi"
+    node = MathNode(node_type, [mml.make_text(text, mathord_group["mode"], options)])
+
+    default_variant = DEFAULT_VARIANT.get(node_type, "")
+    variant = mml.get_variant(mathord_group, options) or default_variant
+    if variant != default_variant:
         node.set_attribute("mathvariant", variant)
 
     return node

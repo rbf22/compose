@@ -77,7 +77,7 @@ def test_build_mathml_with_simple_textord() -> None:
 
 def test_build_tree_html_output() -> None:
     tree: List[Dict[str, Any]] = [_simple_textord_node("z")]  # minimal parse tree
-    settings = Settings({"output": "html", "displayMode": False})
+    settings = Settings({"output": "html", "display_mode": False})
 
     node = build_tree(tree, "z", settings)
     markup = node.to_markup()
@@ -90,7 +90,7 @@ def test_build_tree_html_output() -> None:
 def test_build_tree_mathml_and_html_combined() -> None:
     tree: List[Dict[str, Any]] = [_simple_textord_node("w")]
     # Default output is htmlAndMathml
-    settings = Settings({"displayMode": True})
+    settings = Settings({"display_mode": True})
 
     node = build_tree(tree, "w", settings)
     markup = node.to_markup()
@@ -103,12 +103,12 @@ def test_build_tree_mathml_and_html_combined() -> None:
 
 def test_options_from_settings_and_display_wrap() -> None:
     settings = Settings({
-        "displayMode": True,
+        "display_mode": True,
         "output": "html",
         "leqno": True,
         "fleqn": True,
-        "maxSize": 10.0,
-        "minRuleThickness": 0.2,
+        "max_size": 10.0,
+        "min_rule_thickness": 0.2,
     })
 
     opts = options_from_settings(settings)
@@ -130,7 +130,7 @@ def test_build_html_tree_matches_build_html() -> None:
     from pytex.build_html import build_html
 
     tree: List[Dict[str, Any]] = [_simple_textord_node("q")]  # minimal tree
-    settings = Settings({"output": "html", "displayMode": False})
+    settings = Settings({"output": "html", "display_mode": False})
 
     # build_html_tree should wrap build_html with katex and optional display.
     direct = build_html(tree, default_options())

@@ -2,24 +2,31 @@
 
 from __future__ import annotations
 
+import inspect
+import re
 from typing import Any, Dict, List, Optional, cast
 
+from .lexer import COMBINING_DIACRITICAL_MARKS_END_REGEX
 from .macro_expander import MacroExpander
 from .parse_error import ParseError
 from .settings import Settings
 from .source_location import SourceLocation
 from .token import Token
 from .types import Mode
+from .unicode_accents import ACCENTS
+from .unicode_scripts import supported_codepoint
 from .unicode_sup_or_sub import UNICODE_SUB_REGEX, U_SUBS_AND_SUPS
+from .unicode_symbols import UNICODE_SYMBOLS
+from .units import valid_unit
 
-# Functions map from define_function, treated here as a dict-like spec
-from .define_function import FUNCTIONS as _FUNCTIONS
-FUNCTIONS: Dict[str, Dict[str, Any]] = cast(Dict[str, Dict[str, Any]], _FUNCTIONS)
+# Functions map imported from define_function as FunctionSpec dataclasses.
+from .define_function import FUNCTIONS, FunctionSpec
 
 try:
-    from .symbols_data import symbols as SYMBOLS
+    from .symbols_data import symbols as SYMBOLS, ATOMS
 except ImportError:
     SYMBOLS = {}
+    ATOMS = {}
 
 IMPLICIT_COMMANDS = {
     "^": True,           # Parser.js
@@ -69,12 +76,12 @@ class Parser:
 
     def parse(self) -> List[Any]:
         """Main parsing function, which parses an entire input."""
-        if not self.settings.globalGroup:
+        if not self.settings.global_group:
             # Create a group namespace for the math expression
             self.gullet.begin_group()
 
         # Use old \color behavior (same as LaTeX's \textcolor) if requested
-        if self.settings.colorIsTextColor:
+        if self.settings.color_is_text_color:
             # Install alias in the macro namespace
             self.gullet.macros.set("\\color", "\\textcolor", global_=True)
 
@@ -86,7 +93,7 @@ class Parser:
             self.expect("EOF")
 
             # End the group namespace for the expression
-            if not self.settings.globalGroup:
+            if not self.settings.global_group:
                 self.gullet.end_group()
 
             return parse
@@ -132,7 +139,7 @@ class Parser:
             if break_on_token_text and lex.text == break_on_token_text:
                 break
             func_spec = FUNCTIONS.get(lex.text)
-            if break_on_infix and func_spec and func_spec.get("infix"):
+            if break_on_infix and func_spec and func_spec.infix:
                 break
             atom = self.parse_atom(break_on_token_text)
             if atom is None:
@@ -210,7 +217,7 @@ class Parser:
         color_node = {
             "type": "color",
             "mode": self.mode,
-            "color": self.settings.errorColor,
+            "color": self.settings.error_color,
             "body": [text_node],
         }
 
@@ -326,18 +333,27 @@ class Parser:
         token = self.fetch()
         func = token.text
         func_data = FUNCTIONS.get(func)
+        if func == "\\custom":
+            try:
+                print(
+                    "[DEBUG] parse_function func=", repr(func),
+                    "in FUNCTIONS?", func in FUNCTIONS,
+                    "func_data is None?", func_data is None,
+                )
+            except Exception:
+                pass
         if not func_data:
             return None
         self.consume()  # consume command token
 
-        if name and name != "atom" and not func_data.get("allowedInArgument"):
+        if name and name != "atom" and not func_data.allowed_in_argument:
             raise ParseError(
                 f"Got function '{func}' with no arguments" + (f" as {name}" if name else ""),
                 token
             )
-        elif self.mode == "text" and not func_data.get("allowedInText"):
+        elif self.mode == "text" and not func_data.allowed_in_text:
             raise ParseError(f"Can't use function '{func}' in text mode", token)
-        elif self.mode == "math" and func_data.get("allowedInMath") is False:
+        elif self.mode == "math" and func_data.allowed_in_math is False:
             raise ParseError(f"Can't use function '{func}' in math mode", token)
 
         args, opt_args = self.parse_arguments(func, func_data)
@@ -359,17 +375,74 @@ class Parser:
             "breakOnTokenText": break_on_token_text,
         }
         func = FUNCTIONS.get(name)
-        if func and func.get("handler"):
-            handler = func["handler"]
-            return handler(context, args, opt_args)
+        if func and func.handler:
+            handler = func.handler
+
+            # Handlers in the port may follow either the original KaTeX
+            # signature (context, args, optArgs) or a simplified
+            # (context, args) form.  Use introspection to dispatch to the
+            # appropriate calling convention without breaking either.
+            try:
+                sig = inspect.signature(handler)  # type: ignore[arg-type]
+            except (TypeError, ValueError):  # builtins or unsupported
+                result = handler(context, args, opt_args)  # type: ignore[misc]
+            else:
+                params = list(sig.parameters.values())
+                # Count only positional/positional-or-keyword parameters; ignore
+                # *args/**kwargs as they happily accept either form.
+                positional_params = [p for p in params if p.kind in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                )]
+
+                if len(positional_params) <= 2:
+                    result = handler(context, args)  # type: ignore[misc]
+                else:
+                    result = handler(context, args, opt_args)  # type: ignore[misc]
+
+            # In KaTeX, a handler is expected to return a parse node.  For the
+            # Python port we treat falsy/empty returns (such as "{}" from a
+            # user-defined function) as an internal no-op node so that the
+            # parser recognises the function name but drops it from the final
+            # expression.
+            if not result:
+                return {
+                    "type": "internal",
+                    "mode": self.mode,
+                }
+            return result
         else:
             raise ParseError(f"No function handler for {name}")
 
     def parse_arguments(
-        self, func: str, func_data: Dict[str, Any]
+        self, func: str, func_data: "FunctionSpec | Dict[str, Any]"
     ) -> tuple[List[Any], List[Optional[Any]]]:
-        """Parses the arguments of a function or environment."""
-        total_args = func_data.get("numArgs", 0) + func_data.get("numOptionalArgs", 0)
+        """Parses the arguments of a function or environment.
+
+        The *func_data* parameter is normally a FunctionSpec produced by
+        define_function, but some call sites (e.g. environment handling)
+        pass a lightweight dict with KaTeX-style keys such as
+        ``numArgs`` and ``numOptionalArgs``.
+        """
+
+        def _num_args(spec: "FunctionSpec | Dict[str, Any]") -> int:
+            return spec.num_args if isinstance(spec, FunctionSpec) else int(spec.get("numArgs", 0))
+
+        def _num_optional_args(spec: "FunctionSpec | Dict[str, Any]") -> int:
+            return spec.num_optional_args if isinstance(spec, FunctionSpec) else int(spec.get("numOptionalArgs", 0))
+
+        def _arg_types(spec: "FunctionSpec | Dict[str, Any]") -> List[Any]:
+            if isinstance(spec, FunctionSpec):
+                return list(spec.arg_types or [])
+            return list(spec.get("argTypes", []) or [])
+
+        def _primitive(spec: "FunctionSpec | Dict[str, Any]") -> bool:
+            return bool(spec.primitive) if isinstance(spec, FunctionSpec) else bool(spec.get("primitive", False))
+
+        def _type_name(spec: "FunctionSpec | Dict[str, Any]") -> Optional[str]:
+            return spec.type if isinstance(spec, FunctionSpec) else spec.get("type")
+
+        total_args = _num_args(func_data) + _num_optional_args(func_data)
         if total_args == 0:
             return [], []
 
@@ -377,13 +450,13 @@ class Parser:
         opt_args: List[Optional[Any]] = []
 
         for i in range(total_args):
-            arg_types = func_data.get("argTypes", [])
+            arg_types = _arg_types(func_data)
             arg_type = arg_types[i] if i < len(arg_types) else None
-            is_optional = i < func_data.get("numOptionalArgs", 0)
+            is_optional = i < _num_optional_args(func_data)
 
             if (
-                func_data.get("primitive") and arg_type is None
-                or (func_data.get("type") == "sqrt" and i == 1 and opt_args and opt_args[0] is None)
+                _primitive(func_data) and arg_type is None
+                or (_type_name(func_data) == "sqrt" and i == 1 and opt_args and opt_args[0] is None)
             ):
                 arg_type = "primitive"
 
@@ -547,7 +620,7 @@ class Parser:
             # Otherwise, just return a nucleus
             result = self.parse_function(break_on_token_text, name) or self.parse_symbol()
             if result is None and text.startswith("\\") and text not in IMPLICIT_COMMANDS:
-                if self.settings.throwOnError:
+                if self.settings.throw_on_error:
                     raise ParseError(f"Undefined control sequence: {text}", first_token)
                 result = self.format_unsupported_cmd(text)
                 self.consume()
@@ -579,19 +652,236 @@ class Parser:
                     }]
                     n -= 1
             i += 1
+    
+    def parse_regex_group(self, regex: "re.Pattern[str]", mode_name: str) -> Token:
+        """Parse a regex-delimited group as a single token.
 
-    # Placeholder methods - will need to be implemented
+        This mirrors KaTeX's Parser.parseRegexGroup helper and is used by
+        parse_size_group when scanning dimension-like arguments.
+        """
+        first_token = self.fetch()
+        last_token = first_token
+        text = ""
+        while True:
+            next_token = self.fetch()
+            if next_token.text == "EOF" or not regex.match(text + next_token.text):
+                break
+            last_token = next_token
+            text += last_token.text
+            self.consume()
+        if text == "":
+            raise ParseError(f"Invalid {mode_name}: '{first_token.text}'", first_token)
+        return first_token.range(last_token, text)
+
     def parse_symbol(self) -> Optional[Any]:
-        """Parse a symbol."""
-        return None
+        """Parse a single symbol or \verb, including Unicode accents.
+
+        This closely follows KaTeX's Parser.parseSymbol.
+        """
+        nucleus = self.fetch()
+        text = nucleus.text
+
+        # \verb handling: \verb<delim>...<delim>, optional leading *.
+        if re.match(r"^\\verb[^a-zA-Z]", text):
+            self.consume()
+            arg = text[5:]
+            star = arg.startswith("*")
+            if star:
+                arg = arg[1:]
+            # tokenRegex guarantees matching first/last delimiter characters
+            if len(arg) < 2 or arg[0] != arg[-1]:
+                raise ParseError(
+                    "\\verb assertion failed -- please report what input caused this bug",
+                    nucleus,
+                )
+            body = arg[1:-1]
+            return {
+                "type": "verb",
+                "mode": "text",
+                "loc": nucleus.loc,
+                "body": body,
+                "star": star,
+            }
+
+        # At this point we should have a symbol, possibly with accents.
+        # First expand any precomposed accented Unicode symbol.
+        if text and text[0] in UNICODE_SYMBOLS and not SYMBOLS.get(self.mode, {}).get(text[0]):
+            if self.settings.strict and self.mode == Mode.MATH:
+                self.settings.report_nonstrict(
+                    "unicodeTextInMathMode",
+                    f"Accented Unicode text character \"{text[0]}\" used in math mode",
+                    nucleus,
+                )
+            text = UNICODE_SYMBOLS[text[0]] + text[1:]
+
+        # Strip off trailing combining diacritical marks (accents).
+        match = COMBINING_DIACRITICAL_MARKS_END_REGEX.search(text)
+        accents = ""
+        if match:
+            base = text[: match.start()]
+            accents = text[match.start():]
+            if base == "i":
+                base = "\u0131"  # dotless i
+            elif base == "j":
+                base = "\u0237"  # dotless j
+            text = base
+
+        symbol: Optional[Dict[str, Any]]
+        mode_symbols = SYMBOLS.get(self.mode.value if isinstance(self.mode, Mode) else self.mode, {})
+        info = mode_symbols.get(text)
+
+        if info is not None:
+            group = info.get("group")
+            loc = nucleus.loc
+            if group in ATOMS:
+                # Atom families (bin, rel, open, close, etc.) are represented
+                # as a dedicated "atom" node with a family field.
+                symbol = {
+                    "type": "atom",
+                    "mode": self.mode,
+                    "loc": loc,
+                    "family": group,
+                    "text": text,
+                }
+            else:
+                symbol = {
+                    "type": group,
+                    "mode": self.mode,
+                    "loc": loc,
+                    "text": text,
+                }
+        elif text and ord(text[0]) >= 0x80:
+            codepoint = ord(text[0])
+            if self.settings.strict and not supported_codepoint(codepoint):
+                self.settings.report_nonstrict(
+                    "unknownSymbol",
+                    f"Unrecognized Unicode character \"{text[0]}\" ({codepoint})",
+                    nucleus,
+                )
+            elif self.settings.strict and self.mode == Mode.MATH:
+                self.settings.report_nonstrict(
+                    "unicodeTextInMathMode",
+                    f"Unicode text character \"{text[0]}\" used in math mode",
+                    nucleus,
+                )
+            # Render all nonmathematical Unicode characters as if in text mode.
+            symbol = {
+                "type": "textord",
+                "mode": "text",
+                "loc": nucleus.loc,
+                "text": text,
+            }
+        elif text and text != "EOF":
+            # Basic ASCII characters (e.g. letters, digits) that are not
+            # present in the symbol tables are treated as ordinary symbols.
+            # This mirrors KaTeX's behaviour of producing mathord/textord
+            # nodes for unknown characters instead of failing the parse.
+            symbol = {
+                "type": "mathord" if self.mode == Mode.MATH else "textord",
+                "mode": self.mode,
+                "loc": nucleus.loc,
+                "text": text,
+            }
+        else:
+            # Internal EOF sentinel (or truly empty text) – no symbol.
+            return None
+
+        self.consume()
+
+        # Transform combining characters into explicit accent nodes.
+        if accents:
+            for accent in accents:
+                mapping = ACCENTS.get(accent)
+                if not mapping:
+                    raise ParseError(f"Unknown accent '{accent}'", nucleus)
+                command = mapping.get(self.mode.value if isinstance(self.mode, Mode) else str(self.mode)) or mapping.get("text")
+                if not command:
+                    raise ParseError(
+                        f"Accent {accent} unsupported in {self.mode} mode",
+                        nucleus,
+                    )
+                symbol = {
+                    "type": "accent",
+                    "mode": self.mode,
+                    "loc": nucleus.loc,
+                    "label": command,
+                    "isStretchy": False,
+                    "isShifty": True,
+                    "base": symbol,
+                }
+
+        return symbol
 
     def parse_size_group(self, optional: bool) -> Optional[Any]:
-        """Parse a size specification."""
-        return None
+        """Parse a size specification (magnitude + unit).
+
+        This mirrors KaTeX's Parser.parseSizeGroup and returns a SizeParseNode
+        with a Measurement-like payload.
+        """
+        self.gullet.consume_spaces()  # don't expand before parse_string_group
+
+        if not optional and self.gullet.future().text != "{":
+            token = self.parse_regex_group(
+                re.compile(r"^[-+]? *(?:$|\d+|\d+\.\d*|\.\d*) *[a-z]{0,2} *$"),
+                "size",
+            )
+        else:
+            token = self.parse_string_group("size", optional)
+
+        if token is None:
+            return None
+
+        text = token.text
+        is_blank = False
+
+        if not optional and text == "":
+            # For mandatory size arguments like \above{} and \genfrac.
+            text = "0pt"
+            is_blank = True
+
+        match = re.search(r"([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})", text)
+        if not match:
+            raise ParseError(f"Invalid size: '{text}'", token)
+
+        number = float((match.group(1) or "") + match.group(2))
+        unit = match.group(3)
+        if not valid_unit(unit):
+            raise ParseError(f"Invalid unit: '{unit}'", token)
+
+        measurement = {"number": number, "unit": unit}
+        return {
+            "type": "size",
+            "mode": self.mode,
+            "value": measurement,
+            "isBlank": is_blank,
+        }
 
     def parse_url_group(self, optional: bool) -> Optional[Any]:
-        """Parse an URL."""
-        return None
+        """Parse a URL argument, handling escapes and catcodes.
+
+        This ports KaTeX's Parser.parseUrlGroup, including temporary catcode
+        changes for '%' and '~' to match hyperref-like behaviour.
+        """
+        # Treat '%' as active and '~' as an ordinary character while scanning.
+        self.gullet.lexer.set_catcode("%", 13)
+        self.gullet.lexer.set_catcode("~", 12)
+        token = self.parse_string_group("url", optional)
+        # Restore default catcodes.
+        self.gullet.lexer.set_catcode("%", 14)
+        self.gullet.lexer.set_catcode("~", 13)
+
+        if token is None:
+            return None
+
+        # Unescape a limited set of characters inside URLs.
+        url = re.sub(r"\\([#$%&~_^{}])", r"\1", token.text)
+
+        return {
+            "type": "url",
+            "mode": self.mode,
+            "loc": token.loc,
+            "url": url,
+        }
 
 
 __all__ = ["Parser"]

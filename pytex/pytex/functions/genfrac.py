@@ -190,14 +190,16 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
         mml.build_group(genfrac_group["denom"], options),
     ])
 
-    if not genfrac_group.get("hasBarLine", True):
+    has_bar_line = genfrac_group.get("hasBarLine", True)
+    bar_size_value = genfrac_group.get("barSize")
+
+    # Match KaTeX's behaviour: for plain \frac and friends that use the
+    # default rule thickness, omit the "linethickness" attribute entirely.
+    # Only emit it when the bar is explicitly suppressed or sized.
+    if not has_bar_line:
         node.set_attribute("linethickness", "0px")
-    else:
-        bar_size_value = genfrac_group.get("barSize")
-        if bar_size_value:
-            rule_width = calculate_size(cast(Measurement, bar_size_value), options)
-        else:
-            rule_width = options.font_metrics().get("defaultRuleThickness", 0.04)
+    elif bar_size_value is not None:
+        rule_width = calculate_size(cast(Measurement, bar_size_value), options)
         node.set_attribute("linethickness", make_em(rule_width))
 
     style = adjust_style(genfrac_group.get("size", "auto"), options.style)

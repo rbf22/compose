@@ -13,15 +13,15 @@ from .style import Style
 def options_from_settings(settings: Settings) -> Options:
     """Create Options from Settings."""
     return Options(
-        style=Style.DISPLAY if settings.displayMode else Style.TEXT,
-        max_size=settings.maxSize,
-        min_rule_thickness=settings.minRuleThickness,
+        style=Style.DISPLAY if settings.display_mode else Style.TEXT,
+        max_size=settings.max_size,
+        min_rule_thickness=settings.min_rule_thickness,
     )
 
 
 def display_wrap(node: DomSpan, settings: Settings) -> DomSpan:
     """Wrap node for display mode."""
-    if settings.displayMode:
+    if settings.display_mode:
         classes = ["katex-display"]
         if settings.leqno:
             classes.append("leqno")
@@ -37,7 +37,7 @@ def build_tree(tree: Any, expression: str, settings: Settings) -> Any:
 
     if settings.output == "mathml":
         from .build_mathml import build_mathml
-        return build_mathml(tree, expression, options, settings.displayMode, True)
+        return build_mathml(tree, expression, options, settings.display_mode, True)
     elif settings.output == "html":
         from .build_html import build_html
         html_node = build_html(tree, options)
@@ -47,7 +47,7 @@ def build_tree(tree: Any, expression: str, settings: Settings) -> Any:
         # Both HTML and MathML
         from .build_mathml import build_mathml
         from .build_html import build_html
-        mathml_node = build_mathml(tree, expression, options, settings.displayMode, False)
+        mathml_node = build_mathml(tree, expression, options, settings.display_mode, False)
         html_node = build_html(tree, options)
         katex_node = make_span(["katex"], [mathml_node, html_node])
         return display_wrap(katex_node, settings)

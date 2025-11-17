@@ -258,7 +258,9 @@ def parse_array(
         "leqno": config.get("leqno"),
     }
 
-    return cast(ParseNode, array_node)
+    # ParseNode is imported only for type checking, so avoid referring to
+    # it at runtime.  The cast is purely for static type checkers.
+    return cast("ParseNode", array_node)
 
 
 def html_builder(group: ParseNode, options: Options) -> DomNode | DocumentFragment:
@@ -640,7 +642,8 @@ def _matrix_handler(context: Dict[str, Any]) -> ParseNode:
             "right": delimiters[1],
             "rightColor": None,
         }
-        return cast(ParseNode, leftright_node)
+        # Avoid referring to ParseNode at runtime; the cast is for type checkers.
+        return cast("ParseNode", leftright_node)
     return res
 
 

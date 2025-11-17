@@ -37,14 +37,19 @@ if TYPE_CHECKING:
 
 def make_text(text: str, mode: Mode, options: Optional[Options] = None) -> TextNode:
     """Create a MathML text node with optional symbol replacement."""
-    if (SYMBOLS.get(mode, {}).get(text) and
-        SYMBOLS[mode][text].get("replace") and
+    # SYMBOLS is keyed by the string mode names ("math"/"text"), while the
+    # builder code often passes a Mode enum. Normalise here so lookups work
+    # regardless of how the caller represents the mode.
+    mode_key = mode.value if isinstance(mode, Mode) else mode
+
+    if (SYMBOLS.get(mode_key, {}).get(text) and
+        SYMBOLS[mode_key][text].get("replace") and
         ord(text[0]) != 0xD835 and  # not surrogate pair
         not (LIGATURES.get(text) and options and
              ((options.font_family and "tt" in options.font_family) or
               (options.font and "tt" in options.font)))):
 
-        text = SYMBOLS[mode][text]["replace"]
+        text = SYMBOLS[mode_key][text]["replace"]
 
     return TextNode(text)
 
@@ -106,8 +111,9 @@ def get_variant(group: SymbolParseNode, options: Options) -> Optional[FontVarian
     if text in ["\\imath", "\\jmath"]:
         return None
 
-    if SYMBOLS.get(mode, {}).get(text, {}).get("replace"):
-        text = SYMBOLS[mode][text]["replace"]
+    mode_key = mode.value if isinstance(mode, Mode) else mode
+    if SYMBOLS.get(mode_key, {}).get(text, {}).get("replace"):
+        text = SYMBOLS[mode_key][text]["replace"]
 
     # Check if we can use this font variant
     from .build_common import FONT_MAP

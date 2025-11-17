@@ -2323,6 +2323,16 @@ ligatures = {
   "''": True
 }
 
+symbols["math"]["+"] = {
+  "font": "main",
+  "group": "bin",
+  "replace": "+"
+}
+symbols["math"]["\\int"] = {
+  "font": "main",
+  "group": "op",
+  "replace": "\u222b"
+}
 
 ATOMS = {
     "bin": 1,

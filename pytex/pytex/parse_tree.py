@@ -35,7 +35,7 @@ def parse_tree(to_parse: str, settings: Settings) -> list:
     # If the input used \tag, it will set the \df@tag macro to the tag.
     # In this case, we separately parse the tag and wrap the tree.
     if parser.gullet.macros.get("\\df@tag"):
-        if not settings.displayMode:
+        if not settings.display_mode:
             raise ParseError("\\tag works only in display equations")
         tree = [{
             "type": "tag",

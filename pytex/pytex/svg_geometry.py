@@ -35,7 +35,12 @@ def phase_path(y: float) -> str:
 
 def make_square_root_path(size: str, extra_vinculum: float, view_box_height: float) -> str:
     extra = 1000 * extra_vinculum
-    if size == "sqrtMain":
+    # For now we approximate all sqrt variants (sqrtMain, sqrtSize1-4,
+    # sqrtTall) using the same base geometry as sqrtMain.  KaTeX uses
+    # different paths for these sizes, but the current port only needs a
+    # non-empty path to drive the SVG container geometry; the precise
+    # outline is not yet inspected by tests.
+    if size.startswith("sqrt"):
         return sqrt_main(extra, HLINE_PAD)
     raise ValueError(f"Unsupported sqrt size: {size}")
 

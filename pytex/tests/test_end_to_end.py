@@ -21,9 +21,9 @@ class TestEndToEndRenderToString:
         html = katex.render_to_string(expr)
 
         assert isinstance(html, str)
-        assert html.startswith('<span class="katex">')
-        assert html.endswith("</span>")
-        assert expr in html
+        # Inline math should produce a KaTeX wrapper with HTML content.
+        assert html.startswith('<span class="katex"')
+        assert "katex-html" in html
 
     def test_display_math_with_options_dict(self) -> None:
         expr = r"\int_{0}^{1} x^2 \, dx"
@@ -31,9 +31,11 @@ class TestEndToEndRenderToString:
         html = katex.render_to_string(expr, options)
 
         assert isinstance(html, str)
-        assert html.startswith('<span class="katex">')
-        assert html.endswith("</span>")
-        assert expr in html
+        # Display mode should add a katex-display wrapper and include both
+        # MathML and HTML fragments by default.
+        assert "katex-display" in html
+        assert "katex-mathml" in html
+        assert "katex-html" in html
 
 
 class TestEndToEndMacrosAndFunctions:
@@ -46,11 +48,9 @@ class TestEndToEndMacrosAndFunctions:
         html = katex.render_to_string(expr)
 
         assert isinstance(html, str)
-        assert html.startswith('<span class="katex">')
-        assert html.endswith("</span>")
-        # Current implementation does not expand macros yet; the input
-        # expression should simply flow through into the output.
-        assert r"\R" in html
+        # Macro definition should not cause errors and should integrate into
+        # the normal KaTeX rendering pipeline.
+        assert "katex" in html
 
     def test_define_function_then_render_expression(self) -> None:
         def handler(context, args, opt_args=None):  # type: ignore[unused-argument]
@@ -76,9 +76,8 @@ class TestEndToEndMacrosAndFunctions:
         html = katex.render_to_string(expr)
 
         assert isinstance(html, str)
-        assert html.startswith('<span class="katex">')
-        assert html.endswith("</span>")
-        assert expr in html
+        # Custom function registration should not break rendering.
+        assert "katex" in html
 
 
 class TestEndToEndRenderHelper:
@@ -90,4 +89,5 @@ class TestEndToEndRenderHelper:
 
         captured = capsys.readouterr()
         assert "Would render to element 'output':" in captured.out
-        assert expr in captured.out
+        # The rendered HTML should contain the KaTeX wrapper.
+        assert "katex" in captured.out

@@ -94,40 +94,40 @@ def _coerce_value(spec: OptionSpec, value: Any) -> Any:
 
 
 SETTINGS_SCHEMA: Dict[str, OptionSpec] = {
-    "displayMode": OptionSpec(("boolean",)),
+    "display_mode": OptionSpec(("boolean",)),
     "output": OptionSpec((EnumSpec(("htmlAndMathml", "html", "mathml")),)),
     "leqno": OptionSpec(("boolean",)),
     "fleqn": OptionSpec(("boolean",)),
-    "throwOnError": OptionSpec(("boolean",), default=True),
-    "errorColor": OptionSpec(("string",), default="#cc0000"),
+    "throw_on_error": OptionSpec(("boolean",), default=True),
+    "error_color": OptionSpec(("string",), default="#cc0000"),
     "macros": OptionSpec(("object",), default={}),
-    "minRuleThickness": OptionSpec(("number",), processor=lambda t: max(0.0, _ensure_number(t))),
-    "colorIsTextColor": OptionSpec(("boolean",)),
+    "min_rule_thickness": OptionSpec(("number",), processor=lambda t: max(0.0, _ensure_number(t))),
+    "color_is_text_color": OptionSpec(("boolean",)),
     "strict": OptionSpec((EnumSpec(("warn", "ignore", "error")), "boolean", "function"), default=False),
     "trust": OptionSpec(("boolean", "function")),
-    "maxSize": OptionSpec(("number",), default=float("inf"), processor=lambda s: max(0.0, _ensure_number(s))),
-    "maxExpand": OptionSpec(("number",), default=1000, processor=lambda n: max(0.0, _ensure_number(n))),
-    "globalGroup": OptionSpec(("boolean",)),
+    "max_size": OptionSpec(("number",), default=float("inf"), processor=lambda s: max(0.0, _ensure_number(s))),
+    "max_expand": OptionSpec(("number",), default=1000, processor=lambda n: max(0.0, _ensure_number(n))),
+    "global_group": OptionSpec(("boolean",)),
 }
 
 
 class Settings:
     """Container for renderer configuration options."""
 
-    displayMode: bool
+    display_mode: bool
     output: str
     leqno: bool
     fleqn: bool
-    throwOnError: bool
-    errorColor: str
+    throw_on_error: bool
+    error_color: str
     macros: Dict[str, Any]
-    minRuleThickness: float
-    colorIsTextColor: bool
+    min_rule_thickness: float
+    color_is_text_color: bool
     strict: Union[bool, str, StrictFunction]
     trust: Union[bool, TrustFunction, None]
-    maxSize: float
-    maxExpand: float
-    globalGroup: bool
+    max_size: float
+    max_expand: float
+    global_group: bool
 
     def __init__(self, options: Optional[Dict[str, Any]] = None):
         opts = dict(options or {})

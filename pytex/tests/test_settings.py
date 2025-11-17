@@ -95,10 +95,10 @@ class TestSettingsDefaultsAndSchema:
         s2 = Settings()
 
         # A few representative defaults from the schema.
-        assert s1.displayMode is False
+        assert s1.display_mode is False
         assert s1.output == "htmlAndMathml"
-        assert s1.throwOnError is True
-        assert s1.errorColor == "#cc0000"
+        assert s1.throw_on_error is True
+        assert s1.error_color == "#cc0000"
 
         # Objects should be deep-copied per instance (e.g. macros).
         assert isinstance(s1.macros, dict)
@@ -106,26 +106,26 @@ class TestSettingsDefaultsAndSchema:
         assert s1.macros is not s2.macros
 
         # Numeric processors should clamp at zero for negative inputs.
-        s3 = Settings({"minRuleThickness": -1.0, "maxSize": -10, "maxExpand": -5})
-        assert s3.minRuleThickness == 0.0
-        assert s3.maxSize == 0.0
-        assert s3.maxExpand == 0.0
+        s3 = Settings({"min_rule_thickness": -1.0, "max_size": -10, "max_expand": -5})
+        assert s3.min_rule_thickness == 0.0
+        assert s3.max_size == 0.0
+        assert s3.max_expand == 0.0
 
     def test_settings_schema_contains_expected_keys(self) -> None:
         # Sanity check to make sure schema remains in sync with the class.
         for key in (
-            "displayMode",
+            "display_mode",
             "output",
             "leqno",
             "fleqn",
-            "throwOnError",
-            "errorColor",
+            "throw_on_error",
+            "error_color",
             "macros",
-            "minRuleThickness",
+            "min_rule_thickness",
             "strict",
             "trust",
-            "maxSize",
-            "maxExpand",
+            "max_size",
+            "max_expand",
         ):
             assert key in SETTINGS_SCHEMA
 

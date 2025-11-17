@@ -184,9 +184,9 @@ class MacroExpander:
     def count_expansion(self, amount: int) -> None:
         """Increment expansionCount by the specified amount."""
         self.expansion_count += amount
-        if self.expansion_count > self.settings.maxExpand:
+        if self.expansion_count > self.settings.max_expand:
             raise ParseError(
-                "Too many expansions: infinite loop or need to increase maxExpand setting"
+                "Too many expansions: infinite loop or need to increase max_expand setting"
             )
 
     def expand_once(self, expandable_only: bool = False) -> Union[int, bool]:

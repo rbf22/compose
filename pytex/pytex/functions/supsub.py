@@ -229,17 +229,6 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
         base = base_dict
         if (base and base.get("type") == "op" and base.get("limits") and
             (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
-            node_type = "mover"
-        elif (base and base.get("type") == "operatorname" and
-              base.get("alwaysHandleSupSub") and
-              (base.get("limits") or options.style == Style.DISPLAY)):
-            node_type = "mover"
-        else:
-            node_type = "msup"
-    elif sub_node is None:
-        base = base_dict
-        if (base and base.get("type") == "op" and base.get("limits") and
-            (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
             node_type = "munder"
         elif (base and base.get("type") == "operatorname" and
               base.get("alwaysHandleSupSub") and
@@ -247,6 +236,17 @@ def mathml_builder(group: ParseNode, options: "Options") -> MathNode:
             node_type = "munder"
         else:
             node_type = "msub"
+    elif sub_node is None:
+        base = base_dict
+        if (base and base.get("type") == "op" and base.get("limits") and
+            (options.style == Style.DISPLAY or base.get("alwaysHandleSupSub"))):
+            node_type = "mover"
+        elif (base and base.get("type") == "operatorname" and
+              base.get("alwaysHandleSupSub") and
+              (base.get("limits") or options.style == Style.DISPLAY)):
+            node_type = "mover"
+        else:
+            node_type = "msup"
     else:
         base = base_dict
         if (base and base.get("type") == "op" and base.get("limits") and

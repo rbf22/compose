@@ -115,6 +115,14 @@ class TestKaTeXConfiguration:
         assert isinstance(inline, str)
         assert isinstance(display, str)
 
+        # Inline output should not have the display wrapper.
+        assert "katex-display" not in inline
+
+        # Display output should wrap the katex span with katex-display and
+        # still contain the core katex wrapper.
+        assert "katex-display" in display
+        assert "katex" in display
+
     def test_options_dict_handling(self) -> None:
         """Test that options dictionary is handled properly."""
         import pytex.katex as katex

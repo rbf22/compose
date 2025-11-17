@@ -109,7 +109,15 @@ def define_function(spec: Union[FunctionDefSpec, Dict[str, Any]]) -> None:
     )
 
     for name in spec.names:
+        # Normalise legacy KaTeX-style function names that may be written
+        # with a double leading backslash in Python (e.g. r"\\custom").
+        # The parser always sees TeX control sequences with a single
+        # leading backslash ("\\custom"), so register both forms.
+        canonical = name
+        if canonical.startswith("\\\\") and not canonical.startswith("\\\\\\"):
+            canonical = canonical[1:]
         FUNCTIONS[name] = data
+        FUNCTIONS[canonical] = data
 
     if spec.type:
         if spec.html_builder:

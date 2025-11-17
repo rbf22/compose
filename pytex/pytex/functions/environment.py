@@ -2,6 +2,7 @@ r"""Python port of KaTeX's functions/environment.js - environment commands."""
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Sequence, cast
 
 from ..define_environment import ENVIRONMENTS, EnvSpec
@@ -61,9 +62,34 @@ def _environment_handler(context: Dict[str, Any], args: List[AnyParseNode]) -> A
             "parser": parser,
         }
 
-        # Call environment handler
-        handler = cast(EnvHandler, env.handler)
-        result = handler(env_context, args_result, opt_args)
+        # Call environment handler.  Handlers in this port may accept
+        # just the context, (context, args), or (context, args, opt_args)
+        # depending on how closely they mirror KaTeX.  Use lightweight
+        # introspection to adapt to all three forms.
+        handler = env.handler
+        if handler is None:
+            raise ParseError(f"Environment '{env_name}' has no handler", parser.next_token)
+
+        try:
+            sig = inspect.signature(handler)  # type: ignore[arg-type]
+        except (TypeError, ValueError):  # builtins or unsupported
+            result = handler(env_context, args_result, opt_args)  # type: ignore[misc]
+        else:
+            params = [
+                p
+                for p in sig.parameters.values()
+                if p.kind in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                )
+            ]
+
+            if len(params) <= 1:
+                result = handler(env_context)  # type: ignore[misc]
+            elif len(params) == 2:
+                result = handler(env_context, args_result)  # type: ignore[misc]
+            else:
+                result = handler(env_context, args_result, opt_args)  # type: ignore[misc]
 
         # Expect \end
         parser.expect("\\end", False)

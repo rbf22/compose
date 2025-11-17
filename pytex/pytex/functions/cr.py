@@ -34,17 +34,23 @@ def _cr_handler(context: Dict[str, Any], args: List[Any], opt_args: List[Any]) -
     """Handler for line break (\\) command."""
     parser = context["parser"]
 
-    # Parse optional size argument [size]
-    size_node = parser.parse_size_group(True) if parser.gullet.future()["text"] == "[" else None
+    # Parse optional size argument [size].  The macro expander's future()
+    # method returns a Token, so we inspect its .text attribute.
+    future_tok = parser.gullet.future()
+    size_node = parser.parse_size_group(True) if future_tok.text == "[" else None
     size_value: Optional[Measurement] = None
     if size_node is not None:
         size_value = cast("SizeParseNode", assert_node_type(size_node, "size"))["value"]
 
-    # Determine if this creates a new line
-    new_line = (not parser.settings.display_mode or
-               not parser.settings.use_strict_behavior(
-                   "newLineInDisplayMode",
-                   "In LaTeX, \\\\ or \\newline does nothing in display mode"))
+    # Determine if this creates a new line based on the display_mode
+    # setting and strict behavior.
+    new_line = (
+        not parser.settings.display_mode
+        or not parser.settings.use_strict_behavior(
+            "newLineInDisplayMode",
+            "In LaTeX, \\ or \\newline does nothing in display mode",
+        )
+    )
 
     return {
         "type": "cr",

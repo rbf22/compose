@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, cast
 
+from ..build_common import make_span
 from ..define_function import define_function, normalize_argument
 from ..utils import is_character_box
 
@@ -37,7 +38,19 @@ def html_builder(group: ParseNode, options: "Options") -> Any:
     font_group = cast("FontParseNode", group)
     font_name = font_group.get("font", "")
     new_options = options.with_font(font_name)
-    return html.build_expression(font_group["body"], new_options, True)
+
+    body = font_group.get("body")
+    if isinstance(body, list):
+        expr = body
+    elif body is None:
+        expr = []
+    else:
+        expr = [body]
+
+    elements = html.build_expression(expr, new_options, True)
+    # Wrap the expression in a single span so callers receive a single
+    # HtmlDomNode rather than a raw list.
+    return make_span(["mord"], elements, new_options)
 
 
 def mathml_builder(group: ParseNode, options: "Options") -> Any:
@@ -47,7 +60,22 @@ def mathml_builder(group: ParseNode, options: "Options") -> Any:
     font_group = cast("FontParseNode", group)
     font_name = font_group.get("font", "")
     new_options = options.with_font(font_name)
-    return mml.build_expression(font_group["body"], new_options)
+
+    body = font_group.get("body")
+    if isinstance(body, list):
+        expr = body
+    elif body is None:
+        expr = []
+    else:
+        expr = [body]
+
+    nodes = mml.build_expression(expr, new_options)
+    # build_expression returns a list of MathNode objects; callers of
+    # mathml_builder expect a single MathNode, so wrap in an <mrow> when
+    # needed, mirroring other builders like mclass.
+    if len(nodes) == 1:
+        return nodes[0]
+    return mml.make_row(nodes)
 
 
 # Font aliases

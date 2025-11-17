@@ -59,6 +59,8 @@ class SpaceNode:
     def to_markup(self) -> str:
         if 0.05555 <= self.width <= 0.05556:
             return "<mtext>\u200a</mtext>"
+        if 0.1666 <= self.width <= 0.1667:
+            return "<mtext>\u2009</mtext>"
         return f"<mspace width=\"{make_em(self.width)}\"/>"
 
     def to_text(self) -> str:
