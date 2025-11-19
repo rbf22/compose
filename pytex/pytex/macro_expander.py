@@ -17,7 +17,7 @@ from .types import Mode
 SymbolTable = Dict[str, Dict[str, Any]]
 
 try:
-    from .symbols_data import symbols as _SYMBOLS
+    from .symbols_data_generated import symbols as _SYMBOLS
 except ImportError:
     SYMBOLS: SymbolTable = {}
 else:

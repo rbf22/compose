@@ -18,7 +18,14 @@ from mistletoe.base_renderer import BaseRenderer
 
 from .config import Rules
 from .html_renderer import MathSpan
-from .math_pdf_layout import FractionBox, parse_latex_to_box, draw_math_box
+from .math_pdf_layout import (
+    BoxMetrics,
+    FractionBox,
+    SymbolBox,
+    measure_math_box,
+    parse_latex_to_box,
+    draw_math_box,
+)
 
 
 def _import_fpdf():
@@ -150,18 +157,14 @@ class PdfRenderer(BaseRenderer):
 
             # Inline flow: convert children into a sequence of text
             # segments and MathBox instances, then draw them at a shared
-            # baseline. We slightly increase line height if any fraction
-            # appears.
-            items = []  # list[tuple[str, object]] where kind is "text" or "box"
-            has_fraction = False
+            # baseline with basic word-level line breaking.
+            items: list[tuple[str, object]] = []  # ("text"|"box", value)
 
             for child in children:
                 if isinstance(child, MathSpan):
                     box = parse_latex_to_box(child.latex)
                     if box is not None:
                         items.append(("box", box))
-                        if isinstance(box, FractionBox):
-                            has_fraction = True
                         continue
 
                     # Fallback: render math as plain text.
@@ -174,30 +177,69 @@ class PdfRenderer(BaseRenderer):
                         items.append(("text", seg))
 
             if items:
+                max_x = self.pdf.w - self.pdf.r_margin
                 x = self.pdf.l_margin
-                y = self.pdf.get_y() + self._base_font_size
+                baseline_y = self.pdf.get_y() + self._base_font_size
+                line_height_above = 0.0
+                line_height_below = 0.0
+
+                def _new_line() -> None:
+                    nonlocal x, baseline_y, line_height_above, line_height_below
+                    total = line_height_above + line_height_below
+                    if total <= 0:
+                        total = self._base_font_size * 1.2
+                    self.pdf.ln(total)
+                    x = self.pdf.l_margin
+                    baseline_y = self.pdf.get_y() + self._base_font_size
+                    line_height_above = 0.0
+                    line_height_below = 0.0
 
                 for kind, value in items:
                     if kind == "box":
-                        width = draw_math_box(
+                        box_metrics: BoxMetrics = measure_math_box(
                             self.pdf,
                             value,
-                            x,
-                            y,
                             self._base_font_family,
                             self._base_font_size,
                         )
-                        x += width + 1.0
+                        # Line break if this box would overflow.
+                        if x > self.pdf.l_margin and x + box_metrics.width > max_x:
+                            _new_line()
+                        draw_math_box(
+                            self.pdf,
+                            value,
+                            x,
+                            baseline_y,
+                            self._base_font_family,
+                            self._base_font_size,
+                        )
+                        x += box_metrics.width + 1.0
+                        line_height_above = max(line_height_above, box_metrics.height)
+                        line_height_below = max(line_height_below, box_metrics.depth)
                     else:
                         seg = value
-                        self.pdf.set_font(self._base_font_family, size=self._base_font_size)
-                        self.pdf.text(x, y, seg)
-                        x += self.pdf.get_string_width(seg)
+                        # Split text into word+space chunks so we can wrap.
+                        import re
 
-                line_factor = 1.4
-                if has_fraction:
-                    line_factor = 1.8
-                self.pdf.ln(self._base_font_size * line_factor)
+                        for part in re.findall(r"\S+\s*", seg):
+                            if not part:
+                                continue
+                            word_box = SymbolBox(text=part)
+                            word_metrics = measure_math_box(
+                                self.pdf,
+                                word_box,
+                                self._base_font_family,
+                                self._base_font_size,
+                            )
+                            if x > self.pdf.l_margin and x + word_metrics.width > max_x:
+                                _new_line()
+                            self.pdf.set_font(self._base_font_family, size=self._base_font_size)
+                            self.pdf.text(x, baseline_y, part)
+                            x += word_metrics.width
+                            line_height_above = max(line_height_above, word_metrics.height)
+                            line_height_below = max(line_height_below, word_metrics.depth)
+
+                _new_line()
                 return ""
 
         text = self.render_inner(token)

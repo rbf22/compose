@@ -71,6 +71,11 @@ class RuleAwareHtmlRenderer(HtmlRenderer):
         self._open_section_level: int | None = None
         super().__init__(MathSpan, *extras, **kwargs)
 
+    def _slugify(self, text: str) -> str:
+        s = text.lower()
+        s = re.sub(r"[^a-z0-9]+", "-", s)
+        return s.strip("-")
+
     def render_raw_text(self, token: span_token.RawText) -> str:  # type: ignore[override]
         return self.escape_html_text(token.content)
 
@@ -87,7 +92,22 @@ class RuleAwareHtmlRenderer(HtmlRenderer):
         # Standard HtmlRenderer heading behavior.
         level = getattr(token, "level", 1)
         inner = self.render_inner(token)
-        rendered = f"<h{level}>{inner}</h{level}>"
+
+        cls_attr = ""
+        if self.rules.heading_base_class:
+            cls_val = self.escape_html_text(self.rules.heading_base_class)
+            cls_attr = f' class="{cls_val}"'
+
+        id_attr = ""
+        if getattr(self.rules, "auto_heading_ids", False):
+            plain = re.sub(r"<[^>]+>", "", inner)
+            slug = self._slugify(plain)
+            if slug:
+                prefix = getattr(self.rules, "heading_id_prefix", "") or ""
+                id_val = self.escape_html_text(prefix + slug)
+                id_attr = f' id="{id_val}"'
+
+        rendered = f"<h{level}{cls_attr}{id_attr}>{inner}</h{level}>"
 
         if self.rules.subtitle_after_h1 and level == 1 and not self._seen_h1:
             # After the first H1, treat the next paragraph as a subtitle.
@@ -115,9 +135,25 @@ class RuleAwareHtmlRenderer(HtmlRenderer):
             cls = self.escape_html_text(self.rules.subtitle_class)
             return f'<p class="{cls}">{inner}</p>'
 
+        children = getattr(token, "children", None)
+        if children and len(children) == 1 and isinstance(children[0], MathSpan):
+            math_token = children[0]
+            try:
+                math_html = katex_render(math_token.latex, display_mode=True)
+            except Exception:
+                escaped = self.escape_html_text(f"${math_token.latex}$")
+                return f"<p>{escaped}</p>"
+            cls = self.escape_html_text(self.rules.math_display_class)
+            return f'<div class="{cls}">{math_html}</div>'
+
         # Fallback to HtmlRenderer behavior, including list-related
         # paragraph suppression logic.
-        return super().render_paragraph(token)
+        html = super().render_paragraph(token)
+        para_cls = getattr(self.rules, "paragraph_base_class", None)
+        if para_cls and html.startswith("<p>"):
+            cls_val = self.escape_html_text(para_cls)
+            html = html.replace("<p>", f'<p class="{cls_val}">', 1)
+        return html
 
     def render_document(self, token) -> str:  # type: ignore[override]
         # Base behavior: render children and collect footnotes.

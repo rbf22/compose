@@ -27,6 +27,14 @@ def test_typeset_inline_math() -> None:
     assert "$x^2 + 1$" not in html
 
 
+def test_typeset_display_math_paragraph() -> None:
+    text = "Before.\n\n$x^2 + 1$\n\nAfter."
+    html = typeset_markdown_to_html(text, rules=default_rules())
+    # Paragraph that is only $...$ should become display math.
+    assert "math-display" in html
+    assert "$x^2 + 1$" not in html
+
+
 def test_cli_basic(tmp_path: Path, monkeypatch) -> None:
     input_path = tmp_path / "doc.md"
     input_path.write_text("Hello CLI with $x^2$", encoding="utf-8")
@@ -91,3 +99,46 @@ def test_typeset_markdown_to_pdf_basic() -> None:
     assert isinstance(pdf_bytes, (bytes, bytearray))
     # FPDF should produce a valid PDF header.
     assert pdf_bytes.startswith(b"%PDF")
+
+
+def test_html_integration_headings_lists_tables_math_and_ids() -> None:
+    rules = default_rules()
+    rules.heading_base_class = "heading"
+    rules.auto_heading_ids = True
+    rules.heading_id_prefix = "sec-"
+
+    md = "\n".join(
+        [
+            "# My Title",
+            "",
+            "Intro paragraph with inline $x^2$.",
+            "",
+            "## Section One",
+            "",
+            "- Item 1",
+            "- Item 2",
+            "",
+            "| Col1 | Col2 |",
+            "| ---- | ---- |",
+            "| a    | b    |",
+            "",
+            "$y^2 + 1$",
+        ]
+    )
+
+    html = typeset_markdown_to_html(md, rules=rules)
+
+    # Headings should have classes and IDs derived from Rules and text.
+    assert '<h1 class="heading" id="sec-my-title">' in html
+    assert '<h2 class="heading" id="sec-section-one">' in html
+
+    # Inline and display math should be present.
+    assert "math-inline" in html
+    assert "math-display" in html
+
+    # Lists should render with list and list-item elements.
+    assert "<ul>" in html
+    assert "<li>Item 1</li>" in html
+
+    # Tables should render with a <table> wrapper.
+    assert "<table>" in html

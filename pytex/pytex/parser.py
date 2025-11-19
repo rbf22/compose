@@ -22,7 +22,7 @@ from .units import valid_unit
 from .define_function import FUNCTIONS, FunctionSpec
 
 try:
-    from .symbols_data import symbols as SYMBOLS, ATOMS
+    from .symbols_data_generated import symbols as SYMBOLS, ATOMS
 except ImportError:
     SYMBOLS = {}
     ATOMS = {}

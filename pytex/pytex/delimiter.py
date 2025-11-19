@@ -19,7 +19,7 @@ LigatureTable = Dict[str, bool]
 FontMetricsRaw = Dict[str, Dict[str, List[float]]]
 
 try:
-    from .symbols_data import symbols as _SYMBOLS, ligatures as _LIGATURES
+    from .symbols_data_generated import symbols as _SYMBOLS, ligatures as _LIGATURES
 except ImportError:
     SYMBOLS: SymbolTable = {}
     LIGATURES: LigatureTable = {}

@@ -47,6 +47,10 @@ class Rules:
     subtitle_class: str = "subtitle"
     section_from_level: int | None = None
     pdf_vector_math_enabled: bool = False
+    heading_base_class: str | None = None
+    paragraph_base_class: str | None = None
+    auto_heading_ids: bool = False
+    heading_id_prefix: str = ""
 
 
 def default_rules() -> Rules:
@@ -85,6 +89,18 @@ def _rules_from_mapping(data: Mapping[str, Any]) -> Rules:
         except (TypeError, ValueError):
             section_from_level = None
 
+    heading_base_class_value = rules_section.get("heading_base_class")
+    heading_base_class = (
+        str(heading_base_class_value) if heading_base_class_value is not None else None
+    )
+
+    paragraph_base_class_value = rules_section.get("paragraph_base_class")
+    paragraph_base_class = (
+        str(paragraph_base_class_value) if paragraph_base_class_value is not None else None
+    )
+
+    heading_id_prefix = str(rules_section.get("heading_id_prefix", ""))
+
     return Rules(
         math_inline_class=str(rules_section.get("math_inline_class", "math-inline")),
         math_display_class=str(rules_section.get("math_display_class", "math-display")),
@@ -96,6 +112,10 @@ def _rules_from_mapping(data: Mapping[str, Any]) -> Rules:
         subtitle_class=str(rules_section.get("subtitle_class", "subtitle")),
         section_from_level=section_from_level,
         pdf_vector_math_enabled=bool(rules_section.get("pdf_vector_math_enabled", False)),
+        heading_base_class=heading_base_class,
+        paragraph_base_class=paragraph_base_class,
+        auto_heading_ids=bool(rules_section.get("auto_heading_ids", False)),
+        heading_id_prefix=heading_id_prefix,
     )
 
 

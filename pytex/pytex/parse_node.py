@@ -77,7 +77,7 @@ ParseNode = AnyParseNode
 
 # Placeholder for symbols data
 try:
-    from .symbols_data import NON_ATOMS
+    from .symbols_data_generated import NON_ATOMS
 except ImportError:
     NON_ATOMS = {}
 

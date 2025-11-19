@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover - generator/runtime mismatch
     MACROS_DATA = {}
 
 try:
-    from .symbols_data import symbols as _SYMBOLS
+    from .symbols_data_generated import symbols as _SYMBOLS
 except ImportError:  # pragma: no cover - generator/runtime mismatch
     _SYMBOLS = {}
 
