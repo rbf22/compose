@@ -1,0 +1,109 @@
+[tool.poetry]
+name = "compose"
+version = "0.1.0"
+description = "A modular markdown rendering engine in pure Python."
+authors = ["R. Bryn Fenwick <robert_fenwick@epam.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "compose", from = "src" },
+    { include = "mistletoe", from = "src" },
+    { include = "pytex", from = "src" },
+    { include = "fpdf", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+# Mistletoe extras
+pygments = { version = ">=2.11.2,<=2.16", optional = true }
+# Pytex dependencies
+ruff = "^0.14.5"
+# Pytex pdf extras (optional)
+reportlab = { version = "^4.0", optional = true }
+pillow = { version = "^10.0", optional = true }
+
+[tool.poetry.extras]
+highlighting = ["pygments"]
+pdf = ["reportlab", "pillow"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.1"
+parameterized = "*"
+mypy = "^1.0"
+black = "^22.0"
+isort = "^5.0"
+pytest-cov = "^7.0.0"
+
+[tool.poetry.scripts]
+compose = "compose.cli:main"
+mistletoe = "mistletoe.__main__:main"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "E402",   # module level import not at top of file (common in tests)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["compose", "mistletoe", "pytex", "fpdf"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Start permissive, can tighten later
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+exclude = [
+    "^tests/mistletoe/",
+    "^tests/fpdf/",
+    "^tests/pytex/",
+]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

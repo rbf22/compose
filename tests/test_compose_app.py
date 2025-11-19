@@ -1,14 +1,12 @@
-import io
 from pathlib import Path
 
-import compose_app
-from compose_app import (
-    typeset_markdown_to_html,
-    typeset_markdown_to_pdf,
+from compose import (
     default_rules,
     load_rules_from_toml,
+    typeset_markdown_to_html,
+    typeset_markdown_to_pdf,
 )
-from compose_app.cli import main as cli_main
+from compose.cli import main as cli_main
 
 
 def test_typeset_plain_text(tmp_path: Path) -> None:

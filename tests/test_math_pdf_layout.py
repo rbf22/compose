@@ -1,16 +1,15 @@
 import pytest
 
-from compose_app.math_pdf_layout import (
-    SymbolBox,
-    SuperBox,
-    SubBox,
-    SupSubBox,
+from compose.math_pdf_layout import (
     FractionBox,
     SqrtBox,
+    SubBox,
+    SuperBox,
+    SupSubBox,
+    SymbolBox,
     measure_math_box,
     parse_latex_to_box,
 )
-
 from pytex.font_metrics import get_global_metrics, load_metrics
 from pytex.font_metrics_data import FONT_METRICS_DATA
 
